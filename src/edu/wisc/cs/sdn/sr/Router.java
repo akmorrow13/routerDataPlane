@@ -253,7 +253,7 @@ public class Router
 	 * @param etherPacket request packet received by the router
 	 * @param iface interface on which the request packet was received
 	 */
-	private void sendICMPReply(Ethernet etherPacket, Iface iface, byte code, byte type)
+	void sendICMPReply(Ethernet etherPacket, Iface iface, byte code, byte type)
 	{
 		// Populate Ethernet header
 		Ethernet etherReply = new Ethernet();

@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import net.floodlightcontroller.packet.ARP;
 import net.floodlightcontroller.packet.Ethernet;
+import net.floodlightcontroller.packet.ICMP;
 import net.floodlightcontroller.util.MACAddress;
 
 /**
@@ -99,6 +100,43 @@ public class ArpCache implements Runnable
 			/*********************************************************/
 		    /* TODO: send ICMP host unreachable to the source        */ 
 		    /* address of all packets waiting on this request        */
+			
+			
+			Integer requestAddress = request.getIpAddress();
+			Integer requestMask = request.getIface().getSubnetMask();
+			
+			for(Integer waitingRequestIP : this.requests.keySet()){
+				if(this.requests.get(waitingRequestIP).getIpAddress() == requestAddress){
+					
+					Integer destAddress = requestAddress;
+					MACAddress destMAC = this.lookup(destAddress).getMac();
+					
+					// Finding the interfaces and MACs of these addresses
+					
+					String interfaceName = this.router.getRouteTable().findEntry(requestAddress, requestMask).getInterface();
+					Iface interfaceObject = this.router.getInterfaces().get(interfaceName);
+					
+					
+					// sendICMPReply(Ethernet etherPacket, Iface iface, byte code, byte type)
+					
+					Ethernet etherPacket = new Ethernet();	
+					etherPacket.setDestinationMACAddress(destMAC.toBytes());
+					etherPacket.setSourceMACAddress(interfaceObject.getMacAddress().toBytes());
+					
+					etherPacket.setEtherType(Ethernet.TYPE_IPv4);
+
+					
+					ICMP icmpMessage = new ICMP();
+					icmpMessage.setIcmpCode((byte) 1);
+					icmpMessage.setIcmpType((byte) 3);
+					
+					// Stack headers
+					etherPacket.setPayload(icmpMessage);
+					
+					
+					this.router.sendICMPReply(etherPacket, interfaceObject, (byte)0, (byte)3);
+				}
+			}
 			
 			
 		    /*********************************************************/
