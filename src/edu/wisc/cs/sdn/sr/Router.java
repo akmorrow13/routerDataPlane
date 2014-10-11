@@ -288,7 +288,6 @@ public class Router
 	private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 		
 		int destinationIP = -1;
-		String packetStr = null;
 		
 		// Case 1: destined for interface
 		if (arpCache.getRequests().containsValue(etherPacket.getDestinationMAC())) {
@@ -312,77 +311,114 @@ public class Router
 		    RouteTableEntry entry = routeTable.findEntry(destinationIP, inIface.getSubnetMask());
 		    
 			if (interfaces.containsKey(entry.getInterface())) {
+				
 				// IP packet destined for one of router's interfaces
-				
-				packetStr = etherPacket.toString();
-				
-				
-				// Check if ICMP packet
-				if (packetStr.contains("icmp")) {
-					if (calcCheckSum(etherPacket)) {
-						// TODO: echo reply to sending host
-					}
-				}
-				// Check if UDP or TCP packet
-				if (packetStr.contains("ntp")) {
-					
-					// parse destination port
-					int destPort = -1;
-					String packetType = null;
-					
-					int destStart = packetStr.indexOf("\ntp_dst: ") + 9;
-					try {
-						destPort = Integer.parseInt(packetStr.substring(destStart));
-					} catch (ParseException ex) {
-						
-						System.out.println("Error parsing destination port for UDP or TCP packet");
-						System.exit(-1);
-					
-					}
-					
-					// determine packet type: UDP, TCP or other
-					IPacket pkt = (IPacket) etherPacket.getPayload();
-					if (pkt instanceof UDP) {
-						packetType = "UDP";
-					} else if (pkt instanceof TCP) {
-						packetType = "TCP";
-					} else {
-						packetType = "other";
-					}
-					
-					if (destPort == 520 && packetType.equals("UDP")) {
-						
-						// handle RIP packet
-						rip.handlePacket(etherPacket, inIface);
-						
-					} else if (destPort != 520 && (packetType.equals("UDP") || packetType.equals("TCP"))) {
-						
-						// send an ICMP port unreachable (ICMP type 3, code 3) packet to the sending host
-						Ethernet etherPacketReply = new Ethernet();
-						etherPacketReply.setDestinationMACAddress(etherPacket.getSourceMAC());
-						etherPacketReply.setSourceMACAddress(etherPacket.getDestinationMACAddress());
-						sendICMPReply(etherPacketReply, inIface, (byte) 3, (byte) 3);
-
-					} else {
-						// packet ignored, return nothing
-						return;
-					}
-					
-					
+				reRouteInterface(etherPacket, inIface);
 			
-				}
 				
 			} else {
+				
 				// IP packet is NOT destined for one of router's interfaces
-				 if (calcCheckSum(etherPacket)) {
-					 
-				 }
+				 reRouteNonInterface(etherPacket, inIface);
+				 
 			}
 			
 		} else {
 			
 	    	// TODO: IP address not found. Return error
 	    	return;
+		}
+		
+		return;
+	}
+	
+	private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
+		 if (calcCheckSum(etherPacket)) {
+			 // TODO: send error message
+			 return;
+		 }
+		 
+		 // decrement TTL
+		IPv4 pkt = (IPv4) etherPacket.getPayload();
+		
+		byte ttl = pkt.getTtl();
+		ttl -= 1;
+		pkt.setTtl(ttl);
+		
+		/* TODO
+		 * Find out which entry in the routing table has the longest prefix match with the destination IP address.
+		 * Check the ARP cache for the next-hop MAC address corresponding to the next-hop IP. If it's there, 
+		 * send the packet. Otherwise, call waitForArp(...) function in the ARPCache class to send an ARP 
+		 * request for the next-hop IP, and add the packet to the queue of packets waiting on this ARP request.
+		 */
+		
+	}
+	
+	private void reRouteInterface(Ethernet etherPacket, Iface inIface) {
+		
+		String packetStr = null;
+		
+		packetStr = etherPacket.toString();
+		
+		
+		// Check if ICMP packet
+		if (packetStr.contains("icmp")) {
+			if (calcCheckSum(etherPacket)) {
+				
+				// echo reply to sending host
+				ICMP pkt = (ICMP) etherPacket.getPayload();
+				
+				if (pkt.getIcmpType() == pkt.TYPE_ECHO_REQUEST) {
+					
+					sendICMPReply(etherPacket, inIface, pkt.getIcmpCode(), pkt.TYPE_ECHO_REQUEST);
+				}
+				
+				
+			}
+		}
+		// Check if UDP or TCP packet
+		if (packetStr.contains("ntp")) {
+			
+			// parse destination port
+			int destPort = -1;
+			String packetType = null;
+			
+			int destStart = packetStr.indexOf("\ntp_dst: ") + 9;
+			try {
+				destPort = Integer.parseInt(packetStr.substring(destStart));
+			} catch (ParseException ex) {
+				
+				System.out.println("Error parsing destination port for UDP or TCP packet");
+				System.exit(-1);
+			
+			}
+			
+			// determine packet type: UDP, TCP or other
+			IPacket pkt = (IPacket) etherPacket.getPayload();
+			if (pkt instanceof UDP) {
+				packetType = "UDP";
+			} else if (pkt instanceof TCP) {
+				packetType = "TCP";
+			} else {
+				packetType = "other";
+			}
+			
+			if (destPort == 520 && packetType.equals("UDP")) {
+				
+				// handle RIP packet
+				rip.handlePacket(etherPacket, inIface);
+				
+			} else if (destPort != 520 && (packetType.equals("UDP") || packetType.equals("TCP"))) {
+				
+				// send an ICMP port unreachable (ICMP type 3, code 3) packet to the sending host
+				
+				sendICMPReply(etherPacket, inIface, (byte) 3, (byte) 3);
+
+			} else {
+				// packet ignored, return nothing
+				return;
+			}
+			
 		}
 	}
 	
