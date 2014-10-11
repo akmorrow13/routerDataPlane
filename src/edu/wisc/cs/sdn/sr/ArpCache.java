@@ -47,6 +47,14 @@ public class ArpCache implements Runnable
 	}
 	
 	/**
+	 *  Returns the entries member
+	 * @return map of ArpEntries
+	 */
+	public Map<Integer, ArpEntry> getRequests() {
+		return entries;
+	}
+	
+	/**
 	 * Every second: generate ARP request packets, timeout ARP requests, and
 	 * timeout ARP entries.
 	 */

@@ -4,13 +4,18 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Set;
+
+import com.sun.org.apache.xerces.internal.impl.xpath.regex.ParseException;
 
 import edu.wisc.cs.sdn.sr.vns.VNSComm;
 
 import net.floodlightcontroller.packet.ARP;
 import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.ICMP;
+import net.floodlightcontroller.packet.IPacket;
 import net.floodlightcontroller.packet.IPv4;
+import net.floodlightcontroller.packet.TCP;
 import net.floodlightcontroller.packet.UDP;
 import net.floodlightcontroller.util.MACAddress;
 
@@ -221,6 +226,186 @@ public class Router
 		/* TODO: Handle packets                                             */
 		
 		/********************************************************************/
+		
+		
+		
+		if (etherPacket.getEtherType() == etherPacket.TYPE_IPv4) {
+			
+			// Case 1: packet is of type IP 
+			handleIpPacket(etherPacket, inIface);
+			
+		} else if (etherPacket.getEtherType() == etherPacket.TYPE_ARP) {
+			
+			// Case 2: packet is of type ARP
+			handleArpPacket(etherPacket, inIface);
+			
+		} else {
+			// Case 3: packet is of other type
+			// TODO: send back error message
+			
+		}
+		
+		
+	}
+	
+	/**
+	 * Send an ICMP reply packet for a received ARP request packet.
+	 * @param etherPacket request packet received by the router
+	 * @param iface interface on which the request packet was received
+	 */
+	private void sendICMPReply(Ethernet etherPacket, Iface iface, byte code, byte type)
+	{
+		// Populate Ethernet header
+		Ethernet etherReply = new Ethernet();
+		etherReply.setDestinationMACAddress(etherPacket.getSourceMACAddress());
+		etherReply.setSourceMACAddress(iface.getMacAddress().toBytes());
+		etherReply.setEtherType(Ethernet.TYPE_IPv4);
+		
+		// Populate ICMP header
+		ICMP icmpPacket = (ICMP) etherPacket.getPayload();
+		ICMP icmpReply = new ICMP();
+		
+		icmpReply.setIcmpCode(code);
+		icmpReply.setIcmpType(type);
+		icmpReply.setChecksum((short) 0);
+		
+		icmpReply.serialize();
+		
+		// Stack headers
+		etherReply.setPayload(icmpReply);
+		
+		// Send ICMP request
+		System.out.println("Send ICMP reply");
+		System.out.println(icmpReply.toString());
+		this.sendPacket(etherReply, iface);
+	}
+
+	/**
+	 * Handle an IP packet received on a specific interface.
+	 * @param etherPacket the complete ARP packet that was received
+	 * @param inIface the interface on which the packet was received
+	 */
+	private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
+		
+		int destinationIP = -1;
+		String packetStr = null;
+		
+		// Case 1: destined for interface
+		if (arpCache.getRequests().containsValue(etherPacket.getDestinationMAC())) {
+			
+			// get IP address from MAC address
+		    for (int ip : arpCache.getRequests().keySet()) {
+
+		    	if (arpCache.getRequests().get(ip).getMac().equals(etherPacket.getDestinationMAC())) {
+		    		destinationIP = ip;
+		    		break;
+		    	}
+		    }
+		    
+		    if (destinationIP < 0) {
+		    	// TODO: IP address not found. Return error
+		    	return;
+		    }
+		    
+		    
+		    // check if ip corresponds to an interface on the router
+		    RouteTableEntry entry = routeTable.findEntry(destinationIP, inIface.getSubnetMask());
+		    
+			if (interfaces.containsKey(entry.getInterface())) {
+				// IP packet destined for one of router's interfaces
+				
+				packetStr = etherPacket.toString();
+				
+				
+				// Check if ICMP packet
+				if (packetStr.contains("icmp")) {
+					if (calcCheckSum(etherPacket)) {
+						// TODO: echo reply to sending host
+					}
+				}
+				// Check if UDP or TCP packet
+				if (packetStr.contains("ntp")) {
+					
+					// parse destination port
+					int destPort = -1;
+					String packetType = null;
+					
+					int destStart = packetStr.indexOf("\ntp_dst: ") + 9;
+					try {
+						destPort = Integer.parseInt(packetStr.substring(destStart));
+					} catch (ParseException ex) {
+						
+						System.out.println("Error parsing destination port for UDP or TCP packet");
+						System.exit(-1);
+					
+					}
+					
+					// determine packet type: UDP, TCP or other
+					IPacket pkt = (IPacket) etherPacket.getPayload();
+					if (pkt instanceof UDP) {
+						packetType = "UDP";
+					} else if (pkt instanceof TCP) {
+						packetType = "TCP";
+					} else {
+						packetType = "other";
+					}
+					
+					if (destPort == 520 && packetType.equals("UDP")) {
+						
+						// handle RIP packet
+						rip.handlePacket(etherPacket, inIface);
+						
+					} else if (destPort != 520 && (packetType.equals("UDP") || packetType.equals("TCP"))) {
+						
+						// send an ICMP port unreachable (ICMP type 3, code 3) packet to the sending host
+						Ethernet etherPacketReply = new Ethernet();
+						etherPacketReply.setDestinationMACAddress(etherPacket.getSourceMAC());
+						etherPacketReply.setSourceMACAddress(etherPacket.getDestinationMACAddress());
+						sendICMPReply(etherPacketReply, inIface, (byte) 3, (byte) 3);
+
+					} else {
+						// packet ignored, return nothing
+						return;
+					}
+					
+					
+			
+				}
+				
+			} else {
+				// IP packet is NOT destined for one of router's interfaces
+				 if (calcCheckSum(etherPacket)) {
+					 
+				 }
+			}
+			
+		} else {
+			
+	    	// TODO: IP address not found. Return error
+	    	return;
+		}
+	}
+	
+	/**
+	 * Determines whether a packet's checksum is valid
+	 * @param etherPacket
+	 * @return boolean whether checksum is valid
+	 */
+	private boolean calcCheckSum(Ethernet etherPacket) {
+		
+		ICMP pkt = (ICMP) etherPacket.getPayload();
+		
+		// Create a packet copy and recalculate this packet's checksum
+		ICMP pktCopy = new ICMP();
+		pktCopy =  (ICMP) pkt.clone();
+		pktCopy.setChecksum((short) 0);
+		pktCopy.serialize();
+
+		if (pktCopy.getChecksum() == pkt.getChecksum()) {
+			return true;
+		}
+		
+		return false;
 	}
 	
 	/**
