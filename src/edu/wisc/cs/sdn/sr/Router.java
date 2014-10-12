@@ -17,7 +17,8 @@ import net.floodlightcontroller.util.MACAddress;
  * @author Aaron Gember-Jacobson
  */
 public class Router 
-{
+{	
+	
 	/** User under which the router is running */
 	private String user;
 	
@@ -204,7 +205,9 @@ public class Router
 	 * @return true if the packet was sent successfully, otherwise false
 	 */
 	public boolean sendPacket(Ethernet etherPacket, Iface iface)
-	{ return this.vnsComm.sendPacket(etherPacket, iface.getName()); }
+	{ 	
+		return this.vnsComm.sendPacket(etherPacket, iface.getName()); 	
+	}
 	
 	/**
 	 * Handle an Ethernet packet received on a specific interface.
@@ -220,8 +223,7 @@ public class Router
 		/* TODO: Handle packets                                             */
 		
 		/********************************************************************/
-		
-		
+
 
 		if (etherPacket.getEtherType() == Ethernet.TYPE_ARP) {	
 			// Case 1: packet is of type ARP
@@ -229,6 +231,25 @@ public class Router
 			
 		} else if (etherPacket.getEtherType() == Ethernet.TYPE_IPv4) {
 			// Case 2: packet is of type IP 
+			
+			// But fisrt, check if that IP is contained in the ArpCache.
+			
+			IPv4 ipPacket = (IPv4)etherPacket.getPayload();
+			
+			ArpEntry entry = this.arpCache.lookup(ipPacket.getSourceAddress());
+			
+			//int srcAddr = ipPacket.getSourceAddress();
+			//int destAddr = ipPacket.getDestinationAddress();
+			
+			//ipPacket.setSourceAddress(destAddr);
+			//ipPacket.setDestinationAddress(srcAddr);
+			
+			//etherPacket.setPayload(ipPacket);
+			
+			if(entry == null) { // That IP is not in the list.
+				this.arpCache.waitForArp(etherPacket, inIface, ipPacket.getSourceAddress());
+			}
+			
 			handleIpPacket(etherPacket, inIface);
 					
 		} else {
@@ -327,6 +348,7 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 		boolean sentToInterface = false;
 		
 		for(Iface ifaceRouter : interfaces.values()){
+			
 			if (ifaceRouter.getIpAddress() == destinationIP){ // If the packer was sent to an interface of router
 				
 				reRouteInterface(etherPacket, inIface);

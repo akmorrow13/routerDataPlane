@@ -92,8 +92,18 @@ public class ArpCache implements Runnable
 		    /* TODO: send ICMP host unreachable to the source        */ 
 		    /* address of all packets waiting on this request        */
 			
-			
 		    /*********************************************************/
+			
+			int requestAddress = request.getIpAddress();
+			int requestMask = request.getIface().getSubnetMask();
+
+			for(Integer waitingRequestIP : this.requests.keySet()){
+				if(this.requests.get(waitingRequestIP).getIpAddress() == requestAddress){
+					
+					this.router.sendICMPMessage(requestAddress, requestMask, (byte)0, (byte)3);
+
+				}
+			}
 			
 			this.requests.remove(request.getIpAddress());
 		}
@@ -171,10 +181,15 @@ public class ArpCache implements Runnable
 		arpPkt.setSenderHardwareAddress(
 				request.getIface().getMacAddress().toBytes());
 		arpPkt.setSenderProtocolAddress(request.getIface().getIpAddress());
+		
+		arpPkt.setTargetHardwareAddress(broadcastMac); // ******* ADDED BY DENIS!!!
+		
 		arpPkt.setTargetProtocolAddress(request.getIpAddress());
 		
 		// Stack headers
 		etherPkt.setPayload(arpPkt);
+		
+
 		
 		// Send ARP request
 		System.out.println("Send ARP request");
