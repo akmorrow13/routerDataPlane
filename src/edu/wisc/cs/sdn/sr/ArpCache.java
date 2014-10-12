@@ -69,7 +69,7 @@ public class ArpCache implements Runnable
 			{
 				if ((System.currentTimeMillis() - entry.getTimeAdded()) 
 						> TIMEOUT)
-				{ this.entries.remove(entry.getIp()); }
+				{ this.requests.remove(entry.getIp()); }
 			}
 		}
 	}
@@ -94,7 +94,10 @@ public class ArpCache implements Runnable
 			
 		    /*********************************************************/
 			
-			int requestAddress = request.getIpAddress();
+			
+			System.out.println("Host unreachable.");
+			
+			/*int requestAddress = request.getIpAddress();
 			int requestMask = request.getIface().getSubnetMask();
 
 			for(Integer waitingRequestIP : this.requests.keySet()){
@@ -103,15 +106,18 @@ public class ArpCache implements Runnable
 					this.router.sendICMPMessage(requestAddress, requestMask, (byte)0, (byte)3);
 
 				}
-			}
+			}*/
 			
 			this.requests.remove(request.getIpAddress());
 		}
 		else
 		{
+			ArpEntry entry = this.lookup(request.getIpAddress());
 			// Send ARP request packet
-			this.sendArpRequest(request);
-			request.incrementSent();
+			if(entry == null){
+				this.sendArpRequest(request);
+				request.incrementSent();
+			}
 		}
 	}
 	
@@ -154,6 +160,10 @@ public class ArpCache implements Runnable
 		}
 		request.enqueuePacket(etherPacket);
 		this.updateArpRequest(request);
+	}
+	
+	public  Map<Integer, ArpEntry> getEntries(){
+		return this.entries;
 	}
 	
 	/**

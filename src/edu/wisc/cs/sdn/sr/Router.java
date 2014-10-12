@@ -226,28 +226,42 @@ public class Router
 
 
 		if (etherPacket.getEtherType() == Ethernet.TYPE_ARP) {	
+			
+			System.out.println("Received a ARP packet.");
 			// Case 1: packet is of type ARP
 			handleArpPacket(etherPacket, inIface);	
 			
 		} else if (etherPacket.getEtherType() == Ethernet.TYPE_IPv4) {
+			
+			System.out.println("Received a IPv4 packet.");
+			
 			// Case 2: packet is of type IP 
 			
 			// But fisrt, check if that IP is contained in the ArpCache.
 			
 			IPv4 ipPacket = (IPv4)etherPacket.getPayload();
 			
-			ArpEntry entry = this.arpCache.lookup(ipPacket.getSourceAddress());
+			int srcAddr = ipPacket.getSourceAddress();
+			int destAddr =  ipPacket.getDestinationAddress();
 			
-			//int srcAddr = ipPacket.getSourceAddress();
-			//int destAddr = ipPacket.getDestinationAddress();
+			System.out.println("Source: " + Util.intToDottedDecimal(srcAddr));
+			System.out.println("Dest: " + Util.intToDottedDecimal(destAddr));
 			
-			//ipPacket.setSourceAddress(destAddr);
-			//ipPacket.setDestinationAddress(srcAddr);
+			for(int ip : this.arpCache.getEntries().keySet()){
+				System.out.println("reg > " + this.arpCache.getEntries().get(ip).getIp());
+			}
 			
-			//etherPacket.setPayload(ipPacket);
+			ArpEntry entry = this.arpCache.lookup(ipPacket.getDestinationAddress());
 			
 			if(entry == null) { // That IP is not in the list.
+				int ip = ipPacket.getSourceAddress();
+				System.out.println("This IP " + ip + " is not in the ArpCache yet.");
+				System.out.println(ipPacket.getDestinationAddress());
+				System.out.println(this.arpCache.getEntries());
 				this.arpCache.waitForArp(etherPacket, inIface, ipPacket.getSourceAddress());
+				
+			}else{
+				System.out.println("This IP in is the ArpCache!." + ipPacket.getDestinationAddress());
 			}
 			
 			handleIpPacket(etherPacket, inIface);
@@ -280,24 +294,39 @@ public class Router
 		switch(arpPacket.getOpCode())
 		{
 		case ARP.OP_REQUEST:
+			
+			System.out.println("<<<< ***** >>>>> Received a ARP request.");
+			
 			// Check if request is for one of my interfaces
 			if (targetIp == inIface.getIpAddress())
 			{ this.arpCache.sendArpReply(etherPacket, inIface); }
 			break;
 		case ARP.OP_REPLY:
+			
+			System.out.println("***** Received a ARP reply.");
+			
 			// Check if reply is for one of my interfaces
 			if (targetIp != inIface.getIpAddress())
 			{ break; }
 			
+			System.out.println("Target IP" + targetIp);
+			
 			// Update ARP cache with contents of ARP reply
+			
+			int sourceIp = ByteBuffer.wrap(
+					arpPacket.getSenderProtocolAddress()).getInt();
+			
 			ArpRequest request = this.arpCache.insert(
 					new MACAddress(arpPacket.getTargetHardwareAddress()),
-					targetIp);
+					sourceIp);
+
+			System.out.println("Source IP" + targetIp);
 			
 			// Process pending ARP request entry, if there is one
 			if (request != null)
 			{
 				
+				IPv4 waitingIpPacket = null;
 				ARP waitingArpPacket = null;
 				int waitingTargettIp = 0;
 				
@@ -308,22 +337,23 @@ public class Router
 					
 					/*********************************************************/
 					
+					if(packet.getEtherType() == Ethernet.TYPE_ARP){
 					
+						waitingIpPacket = (IPv4)packet.getPayload();
+						
+						waitingArpPacket = (ARP)waitingIpPacket.getPayload();
+						
+						waitingTargettIp = ByteBuffer.wrap(
+								waitingArpPacket.getTargetProtocolAddress()).getInt();
+						
+						// In this moment, the Router received the reply after sending a ARP request via broadcast.
+						// Then, the ArpCache was filled with the pair MAC-IP and that request has to be removed from the waiting list.
+						
+						if(sourceIp == waitingTargettIp){ // Check if that ARP request left from my interface.
+							request.getWaitingPackets().remove(packet); // Remove the packet from the waiting list.
+						}
 					
-					
-					waitingArpPacket = (ARP)packet.getPayload();
-					waitingTargettIp = ByteBuffer.wrap(
-							waitingArpPacket.getTargetProtocolAddress()).getInt();
-					
-					// In this moment, the Router received the reply after sending a ARP request via broadcast.
-					// Then, the ArpCache was filled with the pair MAC-IP and that request has to be removed from the waiting list.
-					
-					if(targetIp == waitingTargettIp){ // Check if that ARP request left from my interface.
-						request.getWaitingPackets().remove(packet); // Remove the packet from the waiting list.
 					}
-					
-					
-					
 					
 					
 				}
@@ -350,7 +380,7 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 		for(Iface ifaceRouter : interfaces.values()){
 			
 			if (ifaceRouter.getIpAddress() == destinationIP){ // If the packer was sent to an interface of router
-				
+				System.out.println("Packet addressed to one interface.");
 				reRouteInterface(etherPacket, inIface);
 				sentToInterface = true;
 				return;
@@ -358,6 +388,7 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 		}
 		
 		if(!sentToInterface){
+			System.out.println("Packet addressed to other IP.");
 			reRouteNonInterface(etherPacket, inIface);
 	    	return;
 		}
@@ -367,10 +398,10 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 	
 	private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 		IPv4 ipPacket = (IPv4)etherPacket.getPayload();
-		 if (verifyCheckSumIP(ipPacket)) {
-			 // TODO: send error message
-			 return;
-		 }
+		// if (verifyCheckSumIP(ipPacket)) {
+		//	 // TODO: send error message
+		//	 return;
+		// }
 		 
 		 // decrement TTL
 		IPv4 pkt = (IPv4) etherPacket.getPayload();
@@ -400,10 +431,12 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 			}
 		}
 		
+		
 		if(icmpPacket != null) { 
 			if (verifyCheckSumICMP(icmpPacket)) {
 				if (icmpPacket.getIcmpType() == ICMP.TYPE_ECHO_REQUEST) {	
-					sendICMPMessage(ipPacket.getDestinationAddress(), inIface.getSubnetMask(), (byte) 0, (byte) 0); // Send a echo reply.
+					System.out.println("Received a echo request.");
+						sendICMPMessage(ipPacket.getSourceAddress(), (byte) 0, (byte) 0); // Send a echo reply to the source address.
 
 				}
 			}
@@ -415,16 +448,19 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 			UDP udpPacket = (UDP)ipPacket.getPayload();
 			
 			if(udpPacket.getDestinationPort() == 520) {
+				System.out.println("Received a 520 UDP");
 				rip.handlePacket(etherPacket, inIface);
 			} else {
-				sendICMPMessage(ipPacket.getDestinationAddress(), inIface.getSubnetMask(), (byte) 3, (byte) 3); // Port unreachable
+				sendICMPMessage(ipPacket.getSourceAddress(), (byte) 3, (byte) 3); // Port unreachable
 			}
 
 		} else if (ipPacket.getProtocol() == IPv4.PROTOCOL_TCP) {
-			sendICMPMessage(ipPacket.getDestinationAddress(), inIface.getSubnetMask(), (byte) 3, (byte) 3); // Port unreachable
+			System.out.println("Received a TCP.");
+			sendICMPMessage(ipPacket.getSourceAddress(), (byte) 3, (byte) 3); // Port unreachable
 			
 		} else {
 			// Ignore the packet.
+			System.out.println("Received other kind of packet.");
 			return;
 		}
 		
@@ -440,7 +476,7 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 		
 		// TODO
 		
-		return true;
+		return false;
 	}
 	
 	
@@ -473,13 +509,25 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 	 * @param etherPacket request packet received by the router
 	 * @param iface interface on which the request packet was received
 	 */
-	void sendICMPMessage(int destIp, int netMask, byte code, byte type){
+	void sendICMPMessage(int destIp, byte code, byte type){
+		
+		System.out.println("Sending ICMP message.");
+		
+		int netMask = Util.dottedDecimalToInt("255.255.255.255");
+		
+		ArpEntry arpEntry = this.arpCache.lookup(destIp);
+		
+		if(arpEntry == null) {
+			System.out.println("Unknown IP (it is not in the ArpCache).");
+			return;
+		}
 		
 		RouteTableEntry rtEntry = this.routeTable.findEntry(destIp, netMask); // Get the route entry for this IP.
 		Iface iface = this.interfaces.get(rtEntry.getInterface()); // Get the interface to reach this IP.
 		
-		MACAddress macDest = this.arpCache.lookup(destIp).getMac(); 
+		MACAddress macDest = arpEntry.getMac(); 		
 		MACAddress macSrc = iface.getMacAddress();
+		
 		int addrSrc = iface.getIpAddress();
 		
 		// Populate ICMP header
@@ -488,7 +536,7 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 		
 		icmpPacket.setIcmpCode(code);
 		icmpPacket.setIcmpType(type);
-		icmpPacket.resetChecksum();
+
 		
 		// Populate IPv4 header
 		
@@ -496,9 +544,11 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 		ipPacket.setDestinationAddress(destIp);
 		ipPacket.setSourceAddress(addrSrc);
 		ipPacket.setProtocol(IPv4.PROTOCOL_ICMP);
-		// **** Maybe more headers here... *************************** //
+		ipPacket.setTtl((byte)64);
+		ipPacket.setVersion((byte) 4);
 		
-		ipPacket.resetChecksum();
+		
+		// **** Maybe more headers here... *************************** //
 		
 		// Inserting the ICMP into the IPv4
 		
@@ -517,7 +567,8 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 		// Send ICMP request
 		System.out.println("Send ICMP reply");
 		System.out.println(icmpPacket.toString());
-		this.sendPacket(etherPacket, iface);
+		boolean status = this.sendPacket(etherPacket, iface);
+		System.out.println(status);
 	}
 	
 	
