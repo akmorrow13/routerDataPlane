@@ -2,20 +2,14 @@ package edu.wisc.cs.sdn.sr;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.Map;
-import java.util.Set;
-
-import com.sun.org.apache.xerces.internal.impl.xpath.regex.ParseException;
 
 import edu.wisc.cs.sdn.sr.vns.VNSComm;
 
 import net.floodlightcontroller.packet.ARP;
 import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.ICMP;
-import net.floodlightcontroller.packet.IPacket;
 import net.floodlightcontroller.packet.IPv4;
-import net.floodlightcontroller.packet.TCP;
 import net.floodlightcontroller.packet.UDP;
 import net.floodlightcontroller.util.MACAddress;
 
@@ -229,13 +223,13 @@ public class Router
 		
 		
 		
-		if (etherPacket.getEtherType() == etherPacket.TYPE_IPv4) {
+		if (etherPacket.getEtherType() == Ethernet.TYPE_IPv4) {
 			
 			
 			// Case 1: packet is of type IP 
 			handleIpPacket(etherPacket, inIface);
 			
-		} else if (etherPacket.getEtherType() == etherPacket.TYPE_ARP) {
+		} else if (etherPacket.getEtherType() == Ethernet.TYPE_ARP) {
 			
 			// Case 2: packet is of type ARP
 			handleArpPacket(etherPacket, inIface);
@@ -256,10 +250,10 @@ public class Router
 	 */
 	void sendICMPMessage(int destIp, int netMask, byte code, byte type){
 		
-		RouteTableEntry rtEntry = this.routeTable.findEntry(destIp, netMask);
-		Iface iface = this.interfaces.get(rtEntry.getInterface());
+		RouteTableEntry rtEntry = this.routeTable.findEntry(destIp, netMask); // Get the route entry for this IP.
+		Iface iface = this.interfaces.get(rtEntry.getInterface()); // Get the interface to reach this IP.
 		
-		MACAddress macDest = this.arpCache.lookup(destIp).getMac();
+		MACAddress macDest = this.arpCache.lookup(destIp).getMac(); 
 		MACAddress macSrc = iface.getMacAddress();
 		int addrSrc = iface.getIpAddress();
 		
@@ -269,7 +263,7 @@ public class Router
 		
 		icmpPacket.setIcmpCode(code);
 		icmpPacket.setIcmpType(type);
-		icmpPacket.setChecksum((short) 0);
+		icmpPacket.resetChecksum();
 		
 		// Populate IPv4 header
 		
@@ -278,6 +272,8 @@ public class Router
 		ipPacket.setSourceAddress(addrSrc);
 		ipPacket.setProtocol(IPv4.PROTOCOL_ICMP);
 		// **** Maybe more headers here... *************************** //
+		
+		ipPacket.resetChecksum();
 		
 		// Inserting the ICMP into the IPv4
 		
@@ -360,69 +356,42 @@ public class Router
 		IPv4 ipPacket = null;
 		ICMP icmpPacket = null;
 		
-		if(etherPacket.getEtherType() == etherPacket.TYPE_IPv4) { // An Ethernet frame has the Type field.
+		if(etherPacket.getEtherType() == Ethernet.TYPE_IPv4) { // An Ethernet frame has the Type field.
 			ipPacket = (IPv4)etherPacket.getPayload();
-			if(ipPacket.getProtocol() == ipPacket.PROTOCOL_ICMP){ // An IPv4 packet has the Protocol field.
+			if(ipPacket.getProtocol() == IPv4.PROTOCOL_ICMP){ // An IPv4 packet has the Protocol field.
 				icmpPacket = (ICMP)ipPacket.getPayload();
 			}
 		}
 		
 		if(icmpPacket != null) { 
 			if (verifyCheckSumICMP(icmpPacket)) {
-				if (icmpPacket.getIcmpType() == icmpPacket.TYPE_ECHO_REQUEST) {
-					
-					//sendICMPMessage(, icmpPacket.getIcmpCode(), icmpPacket.TYPE_ECHO_REQUEST);
+				if (icmpPacket.getIcmpType() == ICMP.TYPE_ECHO_REQUEST) {	
+					sendICMPMessage(ipPacket.getDestinationAddress(), inIface.getSubnetMask(), (byte) 0, (byte) 0); // Send a echo reply.
+
 				}
-				
-				
 			}
 		}
 
 		// Check if UDP or TCP packet
-		if (packetStr.contains("ntp")) {
+		if (ipPacket.getProtocol() == IPv4.PROTOCOL_UDP) {
 			
-			// parse destination port
-			int destPort = -1;
-			String packetType = null;
+			UDP udpPacket = (UDP)ipPacket.getPayload();
 			
-			int destStart = packetStr.indexOf("\ntp_dst: ") + 9;
-			try {
-				destPort = Integer.parseInt(packetStr.substring(destStart));
-			} catch (ParseException ex) {
-				
-				System.out.println("Error parsing destination port for UDP or TCP packet");
-				System.exit(-1);
-			
-			}
-			
-			// determine packet type: UDP, TCP or other
-			IPacket pkt = (IPacket) etherPacket.getPayload();
-			if (pkt instanceof UDP) {
-				packetType = "UDP";
-			} else if (pkt instanceof TCP) {
-				packetType = "TCP";
-			} else {
-				packetType = "other";
-			}
-			
-			if (destPort == 520 && packetType.equals("UDP")) {
-				
-				// handle RIP packet
-				
+			if(udpPacket.getDestinationPort() == 520) {
 				rip.handlePacket(etherPacket, inIface);
-				
-			} else if (destPort != 520 && (packetType.equals("UDP") || packetType.equals("TCP"))) {
-				
-				// send an ICMP port unreachable (ICMP type 3, code 3) packet to the sending host
-				
-				sendICMPReply(etherPacket, inIface, (byte) 3, (byte) 3);
-
 			} else {
-				// packet ignored, return nothing
-				return;
+				sendICMPMessage(ipPacket.getDestinationAddress(), inIface.getSubnetMask(), (byte) 3, (byte) 3); // Port unreachable
 			}
+
+		} else if (ipPacket.getProtocol() == IPv4.PROTOCOL_TCP) {
+			sendICMPMessage(ipPacket.getDestinationAddress(), inIface.getSubnetMask(), (byte) 3, (byte) 3); // Port unreachable
 			
+		} else {
+			// Ignore the packet.
+			return;
 		}
+		
+
 	}
 	
 	/**
@@ -432,19 +401,9 @@ public class Router
 	 */
 	private boolean verifyCheckSumIP(IPv4 ipPacket) { // Only IP Packets contains checksum.
 		
-		//ICMP pkt = (ICMP) etherPacket.getPayload();
+		// TODO
 		
-		// Create a packet copy and recalculate this packet's checksum
-		ICMP pktCopy = new ICMP();
-		pktCopy =  (ICMP) pkt.clone();
-		pktCopy.setChecksum((short) 0);
-		pktCopy.serialize();
-
-		if (pktCopy.getChecksum() == pkt.getChecksum()) {
-			return true;
-		}
-		
-		return false;
+		return true;
 	}
 	
 	
@@ -468,15 +427,6 @@ public class Router
 			return false;
 		}
 	}
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	
 	
 	
