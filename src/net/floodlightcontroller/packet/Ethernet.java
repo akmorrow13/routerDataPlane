@@ -44,7 +44,7 @@ public class Ethernet extends BasePacket {
         etherTypeClassMap = new HashMap<Short, Class<? extends IPacket>>();
         etherTypeClassMap.put(TYPE_ARP, ARP.class);
         etherTypeClassMap.put(TYPE_RARP, ARP.class);
-        etherTypeClassMap.put(TYPE_IPv4, IPv4.class);
+        etherTypeClassMap.put(getTypeIpv4(), IPv4.class);
         etherTypeClassMap.put(TYPE_LLDP, LLDP.class);
         etherTypeClassMap.put(TYPE_BSN, BSN.class);
     }
@@ -464,5 +464,9 @@ public class Ethernet extends BasePacket {
 
         return sb.toString();
     }
+
+	public static short getTypeIpv4() {
+		return TYPE_IPv4;
+	}
 
 }

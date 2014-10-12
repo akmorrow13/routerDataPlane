@@ -123,7 +123,7 @@ public class ArpCache implements Runnable
 					etherPacket.setDestinationMACAddress(destMAC.toBytes());
 					etherPacket.setSourceMACAddress(interfaceObject.getMacAddress().toBytes());
 					
-					etherPacket.setEtherType(Ethernet.TYPE_IPv4);
+					etherPacket.setEtherType(Ethernet.getTypeIpv4());
 
 					
 					ICMP icmpMessage = new ICMP();
