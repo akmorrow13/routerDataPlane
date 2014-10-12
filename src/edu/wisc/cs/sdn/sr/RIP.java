@@ -65,7 +65,7 @@ public class RIP implements Runnable
 	public void handlePacket(Ethernet etherPacket, Iface inIface)
 	{
         // Make sure it is in fact a RIP packet
-        if (etherPacket.getEtherType() != Ethernet.getTypeIpv4())
+        if (etherPacket.getEtherType() != Ethernet.TYPE_IPv4)
         { return; } 
 		IPv4 ipPacket = (IPv4)etherPacket.getPayload();
         if (ipPacket.getProtocol() != IPv4.PROTOCOL_UDP)

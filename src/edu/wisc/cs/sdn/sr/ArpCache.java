@@ -4,7 +4,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import net.floodlightcontroller.packet.ARP;
-import net.floodlightcontroller.packet.Ethernet; 
+import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.util.MACAddress;
 
 /**
@@ -44,14 +44,6 @@ public class ArpCache implements Runnable
 		this.requests = new ConcurrentHashMap<Integer,ArpRequest>();
 		timeoutThread = new Thread(this);
 		timeoutThread.start();
-	}
-	
-	/**
-	 *  Returns the entries member
-	 * @return map of ArpEntries
-	 */
-	public Map<Integer, ArpEntry> getRequests() {
-		return entries;
 	}
 	
 	/**
@@ -99,21 +91,10 @@ public class ArpCache implements Runnable
 			/*********************************************************/
 		    /* TODO: send ICMP host unreachable to the source        */ 
 		    /* address of all packets waiting on this request        */
-			/*********************************************************/
 			
 			
-			int requestAddress = request.getIpAddress();
-			int requestMask = request.getIface().getSubnetMask();
+		    /*********************************************************/
 			
-			
-			for(Integer waitingRequestIP : this.requests.keySet()){
-				if(this.requests.get(waitingRequestIP).getIpAddress() == requestAddress){
-					
-					this.router.sendICMPMessage(requestAddress, requestMask, (byte)0, (byte)3);
-
-				}
-			}
-
 			this.requests.remove(request.getIpAddress());
 		}
 		else
