@@ -97,18 +97,16 @@ public class ArpCache implements Runnable
 			
 			System.out.println("Host unreachable.");
 			
-			/*int requestAddress = request.getIpAddress();
-			int requestMask = request.getIface().getSubnetMask();
+			int requestAddress = request.getIpAddress();
 
 			for(Integer waitingRequestIP : this.requests.keySet()){
 				if(this.requests.get(waitingRequestIP).getIpAddress() == requestAddress){
 					
-					this.router.sendICMPMessage(requestAddress, requestMask, (byte)0, (byte)3);
+					this.requests.remove(requestAddress);
 
 				}
-			}*/
+			}
 			
-			this.requests.remove(request.getIpAddress());
 		}
 		else
 		{
