@@ -7,6 +7,7 @@ import java.util.Map;
 import edu.wisc.cs.sdn.sr.vns.VNSComm;
 
 import net.floodlightcontroller.packet.ARP;
+import net.floodlightcontroller.packet.BasePacket;
 import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.ICMP;
 import net.floodlightcontroller.packet.IPv4;
@@ -388,10 +389,10 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 	
 	private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 		IPv4 ipPacket = (IPv4)etherPacket.getPayload();
-		// if (verifyCheckSumIP(ipPacket)) {
-		//	 // TODO: send error message
-		//	 return;
-		// }
+		//if (verifyCheckSumIP(ipPacket)) {
+			 // TODO: send error message
+			 //return;
+		//}
 		 
 		 // decrement TTL
 		IPv4 pkt = (IPv4) etherPacket.getPayload();
@@ -474,9 +475,19 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 	 */
 	private boolean verifyCheckSumIP(IPv4 ipPacket) { // Only IP Packets contains checksum.
 		
-		// TODO
+		int previousCheckSum = ipPacket.getChecksum();
 		
-		return false;
+		// Recalculating the checksum.
+		
+		ipPacket.setChecksum((short) 0);
+		ipPacket.serialize();
+		
+		if(previousCheckSum == ipPacket.getChecksum()) { // The packet is correct.
+			return true;
+		} else {
+			return false;
+		}
+
 	}
 	
 	
@@ -488,21 +499,18 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 	 */
 	private boolean verifyCheckSumICMP(ICMP icmpPacket) { // Only IP Packets contains checksum.
 		
-		// Create a packet copy and recalculate this packet's checksum
-		//ICMP icmpPacketCopy = new ICMP();
-		//icmpPacketCopy =  (ICMP) icmpPacket.clone();
-		//icmpPacketCopy.setChecksum((short) 0);
-		//icmpPacketCopy.serialize();
-
-		//if (icmpPacketCopy.getChecksum() == icmpPacket.getChecksum()) {
-		//	return true;
-		//} else {
-		//return false;
-		//}
+		int previousCheckSum = icmpPacket.getChecksum();
 		
-		// TODO
+		// Recalculating the checksum.
 		
-		return true;
+		icmpPacket.setChecksum((short) 0);
+		icmpPacket.serialize();
+		
+		if(previousCheckSum == icmpPacket.getChecksum()) { // The packet is correct.
+			return true;
+		} else {
+			return false;
+		}
 	}
 	
 	
