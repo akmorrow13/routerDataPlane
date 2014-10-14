@@ -5,7 +5,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import net.floodlightcontroller.packet.ARP;
 import net.floodlightcontroller.packet.Ethernet;
-import net.floodlightcontroller.packet.ICMP;
 import net.floodlightcontroller.util.MACAddress;
 
 /**
@@ -48,14 +47,6 @@ public class ArpCache implements Runnable
 	}
 	
 	/**
-	 *  Returns the entries member
-	 * @return map of ArpEntries
-	 */
-	public Map<Integer, ArpEntry> getRequests() {
-		return entries;
-	}
-	
-	/**
 	 * Every second: generate ARP request packets, timeout ARP requests, and
 	 * timeout ARP entries.
 	 */
@@ -78,7 +69,7 @@ public class ArpCache implements Runnable
 			{
 				if ((System.currentTimeMillis() - entry.getTimeAdded()) 
 						> TIMEOUT)
-				{ this.entries.remove(entry.getIp()); }
+				{ this.requests.remove(entry.getIp()); }
 			}
 		}
 	}
@@ -101,53 +92,30 @@ public class ArpCache implements Runnable
 		    /* TODO: send ICMP host unreachable to the source        */ 
 		    /* address of all packets waiting on this request        */
 			
+		    /*********************************************************/
 			
-			Integer requestAddress = request.getIpAddress();
-			Integer requestMask = request.getIface().getSubnetMask();
 			
+			System.out.println("Host unreachable.");
+			
+			int requestAddress = request.getIpAddress();
+
 			for(Integer waitingRequestIP : this.requests.keySet()){
 				if(this.requests.get(waitingRequestIP).getIpAddress() == requestAddress){
 					
-					Integer destAddress = requestAddress;
-					MACAddress destMAC = this.lookup(destAddress).getMac();
-					
-					// Finding the interfaces and MACs of these addresses
-					
-					String interfaceName = this.router.getRouteTable().findEntry(requestAddress, requestMask).getInterface();
-					Iface interfaceObject = this.router.getInterfaces().get(interfaceName);
-					
-					
-					// sendICMPReply(Ethernet etherPacket, Iface iface, byte code, byte type)
-					
-					Ethernet etherPacket = new Ethernet();	
-					etherPacket.setDestinationMACAddress(destMAC.toBytes());
-					etherPacket.setSourceMACAddress(interfaceObject.getMacAddress().toBytes());
-					
-					etherPacket.setEtherType(Ethernet.TYPE_IPv4);
+					this.requests.remove(requestAddress);
 
-					
-					ICMP icmpMessage = new ICMP();
-					icmpMessage.setIcmpCode((byte) 1);
-					icmpMessage.setIcmpType((byte) 3);
-					
-					// Stack headers
-					etherPacket.setPayload(icmpMessage);
-					
-					
-					this.router.sendICMPReply(etherPacket, interfaceObject, (byte)0, (byte)3);
 				}
 			}
 			
-			
-		    /*********************************************************/
-			
-			this.requests.remove(request.getIpAddress());
 		}
 		else
 		{
+			ArpEntry entry = this.lookup(request.getIpAddress());
 			// Send ARP request packet
-			this.sendArpRequest(request);
-			request.incrementSent();
+			if(entry == null){
+				this.sendArpRequest(request);
+				request.incrementSent();
+			}
 		}
 	}
 	
@@ -192,6 +160,10 @@ public class ArpCache implements Runnable
 		this.updateArpRequest(request);
 	}
 	
+	public  Map<Integer, ArpEntry> getEntries(){
+		return this.entries;
+	}
+	
 	/**
 	 * Send an ARP request packet for a pending ARP request.
 	 * @param request pending request for obtaining the MAC address for an IP
@@ -217,10 +189,15 @@ public class ArpCache implements Runnable
 		arpPkt.setSenderHardwareAddress(
 				request.getIface().getMacAddress().toBytes());
 		arpPkt.setSenderProtocolAddress(request.getIface().getIpAddress());
+		
+		arpPkt.setTargetHardwareAddress(broadcastMac); // ******* ADDED BY DENIS!!!
+		
 		arpPkt.setTargetProtocolAddress(request.getIpAddress());
 		
 		// Stack headers
 		etherPkt.setPayload(arpPkt);
+		
+
 		
 		// Send ARP request
 		System.out.println("Send ARP request");
