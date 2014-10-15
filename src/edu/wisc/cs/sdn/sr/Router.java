@@ -3,6 +3,7 @@ package edu.wisc.cs.sdn.sr;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import edu.wisc.cs.sdn.sr.vns.VNSComm;
 
@@ -436,11 +437,11 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 	
 	if (entry == null) {
 		
-		Ethernet tempEtherPacket = new Ethernet();
-		IPv4 tempIpPacket = new IPv4();
+		this.arpCache.waitForArp(etherPacket, this.interfaces.get(nextHop.getInterface()), nextHop.getDestinationAddress());
 		
-		this.arpCache.waitForArp(tempEtherPacket, , ipPacket.getSourceAddress());
+		// TODO What to do while the router is trying to discover the MAC?
 		
+		return;
 		
 	} else {
 		
