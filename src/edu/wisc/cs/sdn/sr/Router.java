@@ -245,6 +245,7 @@ public class Router
 			if(entry == null) { // That IP is not in the ArpCache.
 				System.out.println("This IP is not in the ArpCache yet.");
 				this.arpCache.waitForArp(etherPacket, inIface, ipPacket.getSourceAddress());
+
 			}else{
 				System.out.println("This IP in is the ArpCache.");
 				handleIpPacket(etherPacket, inIface);
@@ -401,14 +402,17 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 	if (!verifyCheckSumIP(ipPacket)) {
 		 // corrupt packet. Error
 		sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 0, null);
-		 return;
+		// TODO
+		return;
 	 }
 	 
 	// decrement TTL
-	IPv4 pkt = (IPv4) etherPacket.getPayload();
-	byte ttl = pkt.getTtl();
+	byte ttl = ipPacket.getTtl();
 	ttl -= 1;
-	pkt.setTtl(ttl);
+	ipPacket.setTtl(ttl);
+	
+	ipPacket.setChecksum((byte) 0);
+	ipPacket.serialize();
 	
 	 
 	// Find IP longest prefix match
@@ -418,22 +422,23 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 	RouteTableEntry nextHop = null;
 	int lowerNumber = destinationIP;
 	
-	//int lowerNumber = destinationIP;
+	int subnet = 0;
 			
 	for (RouteTableEntry entry : routeTable.getEntries()) {
 		
-		int  tempDiff = (destinationIP & entry.getMaskAddress()) - entry.getDestinationAddress();
+		subnet = entry.getDestinationAddress() & entry.getMaskAddress();
 		
-		if(tempDiff < lowerNumber) {
-			nextHop = entry;
-			lowerNumber = tempDiff;
-			
-		}
+		if((destinationIP & entry.getMaskAddress()) == subnet){
+			int  tempDiff = Math.abs((destinationIP & entry.getMaskAddress()) - entry.getDestinationAddress());
+			if(tempDiff < lowerNumber) {
+				nextHop = entry;
+				lowerNumber = tempDiff;				
+			}
+		}	
 	}
 	
 	// retrieve the next-hop MAC address corresponding to the IP
 	ArpEntry entry = arpCache.lookup(nextHop.getDestinationAddress());
-	
 	
 	if (entry == null) {
 		
@@ -445,21 +450,18 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 		
 	} else {
 		
-		MACAddress MacAddr = entry.getMac();
-		Iface ifaceOut = null;
-		
-		// retrieve interface corresponding to mac address
-		for (String interName : interfaces.keySet()) {
-			if (interfaces.get(interName).getMacAddress().equals(MacAddr)) {
-				ifaceOut = interfaces.get(interName);
-				break;
-			}
-		}
-		
+		Iface ifaceOut =  this.interfaces.get(nextHop.getInterface());
+				
 		if(ifaceOut == null) {
-			// Error: not found on interface
+			// TODO
 			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 0, null);
 		}
+		
+		
+		etherPacket.setPayload(ipPacket);
+		etherPacket.setDestinationMACAddress(entry.getMac().toBytes());
+		etherPacket.setSourceMACAddress(ifaceOut.getMacAddress().toBytes());
+		
 		sendPacket(etherPacket, ifaceOut);
 	}
 	
