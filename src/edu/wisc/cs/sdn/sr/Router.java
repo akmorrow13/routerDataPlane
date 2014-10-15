@@ -358,6 +358,7 @@ public class Router
 	
 	
 private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
+	
 		
 		IPv4 ipPacket = (IPv4)etherPacket.getPayload();
 		int destinationIP = ipPacket.getDestinationAddress();
@@ -387,28 +388,81 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 		return;
 	}
 	
-	private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
-		IPv4 ipPacket = (IPv4)etherPacket.getPayload();
-		//if (verifyCheckSumIP(ipPacket)) {
-			 // TODO: send error message
-			 //return;
-		//}
-		 
-		 // decrement TTL
-		IPv4 pkt = (IPv4) etherPacket.getPayload();
-		
-		byte ttl = pkt.getTtl();
-		ttl -= 1;
-		pkt.setTtl(ttl);
-		
-		/* TODO
-		 * Find out which entry in the routing table has the longest prefix match with the destination IP address.
-		 * Check the ARP cache for the next-hop MAC address corresponding to the next-hop IP. If it's there, 
-		 * send the packet. Otherwise, call waitForArp(...) function in the ARPCache class to send an ARP 
-		 * request for the next-hop IP, and add the packet to the queue of packets waiting on this ARP request.
-		 */
-		
+private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
+	
+	
+	IPv4 ipPacket = null;
+	
+	if(etherPacket.getEtherType() == Ethernet.TYPE_IPv4) { // An Ethernet frame has the Type field.
+		ipPacket = (IPv4)etherPacket.getPayload();
 	}
+	
+	if (!verifyCheckSumIP(ipPacket)) {
+		 // corrupt packet. Error
+		sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 0, null);
+		 return;
+	 }
+	 
+	// decrement TTL
+	IPv4 pkt = (IPv4) etherPacket.getPayload();
+	byte ttl = pkt.getTtl();
+	ttl -= 1;
+	pkt.setTtl(ttl);
+	
+	 
+	// Find IP longest prefix match
+	int destinationIP = ipPacket.getDestinationAddress();
+	
+	// find the IP address in the routing table with the longest prefix match by subtraction comparison
+	RouteTableEntry nextHop = null;
+	int lowerNumber = destinationIP;
+	
+	//int lowerNumber = destinationIP;
+			
+	for (RouteTableEntry entry : routeTable.getEntries()) {
+		
+		int  tempDiff = (destinationIP & entry.getMaskAddress()) - entry.getDestinationAddress();
+		
+		if(tempDiff < lowerNumber) {
+			nextHop = entry;
+			lowerNumber = tempDiff;
+			
+		}
+	}
+	
+	// retrieve the next-hop MAC address corresponding to the IP
+	ArpEntry entry = arpCache.lookup(nextHop.getDestinationAddress());
+	
+	
+	if (entry == null) {
+		
+		Ethernet tempEtherPacket = new Ethernet();
+		IPv4 tempIpPacket = new IPv4();
+		
+		this.arpCache.waitForArp(tempEtherPacket, , ipPacket.getSourceAddress());
+		
+		
+	} else {
+		
+		MACAddress MacAddr = entry.getMac();
+		Iface ifaceOut = null;
+		
+		// retrieve interface corresponding to mac address
+		for (String interName : interfaces.keySet()) {
+			if (interfaces.get(interName).getMacAddress().equals(MacAddr)) {
+				ifaceOut = interfaces.get(interName);
+				break;
+			}
+		}
+		
+		if(ifaceOut == null) {
+			// Error: not found on interface
+			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 0, null);
+		}
+		sendPacket(etherPacket, ifaceOut);
+	}
+	
+}
 	
 	private void reRouteInterface(Ethernet etherPacket, Iface inIface) {
 		
@@ -523,6 +577,10 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 	 * @param originIcmp is optional.
 	 */
 	void sendICMPMessage(int srcIp, int destIp, byte code, byte type, ICMP originIcmp){
+		
+		
+		
+		
 		
 		int netMask = Util.dottedDecimalToInt("255.255.255.255");
 		
