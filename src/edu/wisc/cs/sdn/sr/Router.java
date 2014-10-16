@@ -236,20 +236,8 @@ public class Router
 			
 			System.out.println("Received a IPv4 packet.");
 						
-			// But fisrt, check if that IP is contained in the ArpCache.
-			
-			IPv4 ipPacket = (IPv4)etherPacket.getPayload();
-			
-			ArpEntry entry = this.arpCache.lookup(ipPacket.getSourceAddress());
-			
-			if(entry == null) { // That IP is not in the ArpCache.
-				System.out.println("This IP is not in the ArpCache yet.");
-				this.arpCache.waitForArp(etherPacket, inIface, ipPacket.getSourceAddress());
+			handleIpPacket(etherPacket, inIface);
 
-			}else{
-				System.out.println("This IP in is the ArpCache.");
-				handleIpPacket(etherPacket, inIface);
-			}
 			return;
 					
 		} else {
@@ -286,6 +274,7 @@ public class Router
 		int sourceIp = ByteBuffer.wrap(
 				arpPacket.getSenderProtocolAddress()).getInt();
 		
+		
 		switch(arpPacket.getOpCode())
 		{
 		case ARP.OP_REQUEST:
@@ -295,6 +284,12 @@ public class Router
 			// Check if request is for one of my interfaces
 			if (targetIp == inIface.getIpAddress())
 			{ 
+				// If the destination of the ARP reply is this router, add the information about the sender in the ArpCache.
+				
+				MACAddress sourceMac = MACAddress.valueOf(ByteBuffer.wrap(arpPacket.getSenderHardwareAddress()).array());
+				
+				this.arpCache.insert(sourceMac, sourceIp);			
+				
 				this.arpCache.sendArpReply(etherPacket, inIface); 
 			}
 			
