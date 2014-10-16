@@ -355,9 +355,7 @@ public class Router
 		}
 	}
 	
-	
-	
-	
+
 	
 private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 	
@@ -409,7 +407,18 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 	// decrement TTL
 	byte ttl = ipPacket.getTtl();
 	ttl -= 1;
-	ipPacket.setTtl(ttl);
+	
+	if(ttl > 0) {
+	
+		ipPacket.setTtl(ttl);
+		
+	} else {
+		
+		// If the TTL is 0, so the packet should be dropped.
+		
+		return;
+		
+	}
 	
 	ipPacket.setChecksum((byte) 0);
 	ipPacket.serialize();
@@ -580,10 +589,6 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 	 * @param originIcmp is optional.
 	 */
 	void sendICMPMessage(int srcIp, int destIp, byte code, byte type, ICMP originIcmp){
-		
-		
-		
-		
 		
 		int netMask = Util.dottedDecimalToInt("255.255.255.255");
 		
