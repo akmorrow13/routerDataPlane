@@ -637,20 +637,16 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 		// Populate Ethernet header
 		Ethernet etherPacket = new Ethernet();
 		
-		//etherPacket.setDestinationMACAddress(macDest.toBytes());
-		//etherPacket.setSourceMACAddress(macSrc.toBytes());
+		etherPacket.setDestinationMACAddress(macDest.toBytes());
+		etherPacket.setSourceMACAddress(macSrc.toBytes());
 		etherPacket.setEtherType(Ethernet.TYPE_IPv4);
 		
 		etherPacket.setPayload(ipPacket);
 		
 		// Send ICMP request
 		System.out.println("Sending ICMP message");
-		//this.sendPacket(etherPacket, iface);
 		
-		this.handlePacket(etherPacket, iface);
-		
-		
-		
+		this.sendPacket(etherPacket, iface);
 		
 	}
 	
