@@ -19,6 +19,11 @@ public class RouteTableEntry
 	 * the destination or gateway */
 	private String interfaceName;
 	
+	
+	/** Cost to the final destination*/
+	private int cost;
+	
+	
 	//private int timer = 0;
 	
 	/**
@@ -80,5 +85,13 @@ public class RouteTableEntry
 		result += Util.intToDottedDecimal(maskAddress) + "\t";
 		result += interfaceName;
 		return result;
+	}
+
+	public int getCost() {
+		return cost;
+	}
+
+	public void setCost(int cost) {
+		this.cost = cost;
 	}
 }
