@@ -68,10 +68,8 @@ public class RIP implements Runnable
 
 		this.tasksThread.start();
 
-        /*********************************************************************/
-        /* TODO: Add other initialization code as necessary                  */
-
-        /*********************************************************************/
+		sendRIPResponseBroadcast();
+		
 	}
 
     /**
@@ -91,11 +89,34 @@ public class RIP implements Runnable
         if (udpPacket.getDestinationPort() != UDP.RIP_PORT)
         { return; }
 		RIPv2 ripPacket = (RIPv2)udpPacket.getPayload();
-
-        /*********************************************************************/
-        /* TODO: Handle RIP packet                                           */
-
-        /*********************************************************************/
+		
+		for (RIPv2Entry ripEntry : ripPacket.getEntries()) {
+			
+			RouteTableEntry rtEntry = this.router.getRouteTable().findEntry(ripEntry.getAddress(), ripEntry.getSubnetMask());
+			
+			if (rtEntry == null) {
+				// entry not found, add it to route table
+	            
+				RouteTableEntry newEntry = new RouteTableEntry(ripEntry.getAddress(), 0, 
+						ripEntry.getSubnetMask(),inIface.getName());
+				newEntry.setCost(ripEntry.getMetric() + 1);
+				
+			} else {
+				// check if this is the most updated packet
+				// TODO: what else do we have to check for here?
+				if (rtEntry.getCost() > (ripEntry.getMetric() + 1)) {
+					
+					this.router.getRouteTable().removeEntry(rtEntry.getDestinationAddress(), rtEntry.getMaskAddress());
+					RouteTableEntry newEntry = new RouteTableEntry(ripEntry.getAddress(), 0, 
+							ripEntry.getSubnetMask(),inIface.getName());
+					newEntry.setCost(ripEntry.getMetric() + 1);
+				}
+				
+				// TODO: split horizon issues
+			}
+			
+			
+		}
 		
 		
 		if(ripPacket.getCommand() == RIPv2.COMMAND_REQUEST) {// A new router is asking for my table.
@@ -118,14 +139,6 @@ public class RIP implements Runnable
 	@Override
 	public void run() 
     {
-        /*********************************************************************/
-        /* TODO: Send period updates and time out route table entries        */
-
-        /*********************************************************************/
-		
-		// Update 
-		
-		
 		
 		try { 
 			if(countUpdates < 3){
@@ -153,16 +166,21 @@ public class RIP implements Runnable
      */
 	public void checkForTimeout() {
 		
-		// TODO
-		
-		// Basically, we check if one route which has cost 1 (that is, the router's neighbors)
-		// does not send a RIP packet in the last 30 seconds.
-		
-		// If not, the route removes its information from the route tabble and sends new response in brodcast to 
-		// inform all the other routers about that.
-		
-		// For that, I think the RouteTableEntry has to save more information, like from who the router learned that line
-		// and the time which it received the last update.
+		for (RouteTableEntry rtEntry : this.router.getRouteTable().getEntries()) {
+			
+			// if an entry is a direct neighbor, do nothing
+			if (rtEntry.getCost() <= 1) {
+				
+				continue;
+			} else {
+				
+				long currentTime = System.currentTimeMillis();
+				
+				if (currentTime - rtEntry.getTimStamp()  > (TIMEOUT * 1000)) {
+					this.router.getRouteTable().removeEntry(rtEntry.getDestinationAddress(), rtEntry.getMaskAddress());
+				}
+			}
+		}
 		
 	}
 	
@@ -188,8 +206,8 @@ public class RIP implements Runnable
 		Ethernet etherPacket = new Ethernet();
 		
 		
-		udpPacket.setDestinationPort((short) 520);
-		udpPacket.setSourcePort((short) 520);
+		udpPacket.setDestinationPort(udpPacket.RIP_PORT);
+		udpPacket.setSourcePort(udpPacket.RIP_PORT);
 		udpPacket.setPayload(ripPacket);
 		udpPacket.serialize();
 		
@@ -204,6 +222,7 @@ public class RIP implements Runnable
 		
 		etherPacket.setDestinationMACAddress(BROADCAST_MAC);
 		etherPacket.setEtherType(Ethernet.TYPE_IPv4);
+		etherPacket.setPayload(ipPacket);
 		
 		for(Iface iface : router.getInterfaces().values()) {
 		
@@ -298,7 +317,12 @@ public class RIP implements Runnable
 			// One way to identify the router (in the future, to avoid the count to infinite).
 			// Sincerely, I don't know how to idenfity it (maybe a new attribute).
 			
-			ripEntry.setRouteTag((short)(this.router.hashCode()));
+			//ripEntry.setRouteTag((short)(this.router.hashCode()));
+			ripEntry.setRouteTag(this.router.getTopo());
+			
+			// lookup the next hop address
+			Iface nextIface = this.router.getInterface(rtEntry.getInterface());
+			ripEntry.setNextHopAddress(nextIface.getIpAddress());
 			
 			myEntries.add(ripEntry);
 			

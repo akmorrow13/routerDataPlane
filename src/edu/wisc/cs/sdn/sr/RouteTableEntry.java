@@ -1,5 +1,10 @@
 package edu.wisc.cs.sdn.sr;
 
+import java.sql.Time;
+import java.sql.Timestamp;
+
+import sun.util.resources.CalendarData;
+
 /**
  * An entry in a route table.
  * @author Aaron Gember-Jacobson and Anubhavnidhi Abhashkumar
@@ -23,6 +28,8 @@ public class RouteTableEntry
 	/** Cost to the final destination*/
 	private int cost;
 	
+	private long timeStamp;
+	
 	
 	//private int timer = 0;
 	
@@ -41,6 +48,7 @@ public class RouteTableEntry
 		this.gatewayAddress = gatewayAddress;
 		this.maskAddress = maskAddress;
 		this.interfaceName = ifaceName;
+		this.timeStamp = System.currentTimeMillis();
 	}
 	
 	/**
@@ -54,6 +62,12 @@ public class RouteTableEntry
 	 */
 	public int getGatewayAddress()
 	{ return this.gatewayAddress; }
+	
+	/**
+	 * @return timestamp
+	 */
+	public long getTimStamp()
+	{ return this.timeStamp; }
 
     public void setGatewayAddress(int gatewayAddress)
     { this.gatewayAddress = gatewayAddress; }
@@ -93,5 +107,9 @@ public class RouteTableEntry
 
 	public void setCost(int cost) {
 		this.cost = cost;
+	}
+	
+	public void setTimeStamp(long timeStamp) {
+		this.timeStamp = timeStamp;
 	}
 }
