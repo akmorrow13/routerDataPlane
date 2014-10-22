@@ -214,7 +214,8 @@ public class RIP implements Runnable
      */
 	public void sendRIPResponseBroadcast() {
 		
-		RIPv2 ripPacket = makeRipPacket();
+		RIPv2 ripPacket = new RIPv2();
+		ripPacket = makeRipPacket(ripPacket.COMMAND_REQUEST);
 		UDP udpPacket = new UDP();
 		IPv4 ipPacket = new IPv4();;
 		Ethernet etherPacket = new Ethernet();
@@ -271,7 +272,8 @@ public class RIP implements Runnable
         if (udpPacket.getDestinationPort() != UDP.RIP_PORT)
         { return; }		
 		
-        RIPv2 ripPacket = makeRipPacket();
+        RIPv2 ripPacket = new RIPv2();
+        ripPacket = makeRipPacket(ripPacket.COMMAND_RESPONSE);
 		
 		// RIPv2 works in Application layer, under UDP
 		
@@ -319,7 +321,7 @@ public class RIP implements Runnable
      * Generates a RIP packet based in the route table.
      * @return ripPacket RIP packet with information of the route table.
      */
-	public RIPv2 makeRipPacket() {
+	public RIPv2 makeRipPacket(byte ripType) {
 		
 		RIPv2 ripPacket = new RIPv2();
 			
@@ -353,7 +355,7 @@ public class RIP implements Runnable
 		}
 		
 		ripPacket.setEntries(myEntries);
-		ripPacket.setCommand(RIPv2.COMMAND_RESPONSE);
+		ripPacket.setCommand(ripType);
 	
 		return ripPacket;
 		

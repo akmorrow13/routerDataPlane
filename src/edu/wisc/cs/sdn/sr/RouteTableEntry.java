@@ -1,10 +1,5 @@
 package edu.wisc.cs.sdn.sr;
 
-import java.sql.Time;
-import java.sql.Timestamp;
-
-import sun.util.resources.CalendarData;
-
 /**
  * An entry in a route table.
  * @author Aaron Gember-Jacobson and Anubhavnidhi Abhashkumar
