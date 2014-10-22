@@ -177,9 +177,15 @@ public class RIP implements Runnable
 		for (RIPv2Entry ripEntry : ripPacket.getEntries()) {
 					
 				RouteTableEntry rtEntry = this.router.getRouteTable().findEntry(ripEntry.getAddress(), ripEntry.getSubnetMask());
-					
+				RouteTableEntry newRtEntry = null;
+				
+				newRtEntry  = new RouteTableEntry(ripEntry.getAddress(), ipPacket.getSourceAddress(), 
+						ripEntry.getSubnetMask(), inIface.getName());
+				
+				newRtEntry.setCost(ripEntry.getMetric());
+				
 				if (rtEntry != null) {
-					
+	
 					// check if this is the most updated packet
 					// TODO: what else do we have to check for here?
 					
@@ -196,9 +202,8 @@ public class RIP implements Runnable
 					
 					// TODO: split horizon issues
 				}
-				
-				this.router.getRouteTable().addEntry(ripEntry.getAddress(), ipPacket.getSourceAddress(), 
-						ripEntry.getSubnetMask(), inIface.getName());
+								
+				this.router.getRouteTable().addEntry(newRtEntry);
 				
 			}
 		
@@ -295,7 +300,15 @@ public class RIP implements Runnable
 		
 		etherPacket.setPayload(ipPacket);
 		
-		// Send the packet.
+		
+		
+		// Split horizon
+        
+        // If one entry has as next hop this destination IP, remove it.
+		
+		for(RIPv2Entry ripEntry : ripPacket.getEntries().)
+		
+		
 		this.router.handlePacket(etherPacket, inIface);
 		
 		

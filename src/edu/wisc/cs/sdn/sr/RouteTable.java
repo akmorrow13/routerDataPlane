@@ -139,6 +139,13 @@ public class RouteTable
         }
 	}
 	
+	public void addEntry(RouteTableEntry rtEntry) {
+		synchronized(this.entries)
+        { 
+            this.entries.add(rtEntry);
+        }
+	}
+	
 	/**
 	 * Remove an entry from the route table.
 	 * @param dstIP destination IP of the entry to remove

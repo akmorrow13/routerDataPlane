@@ -24,12 +24,11 @@ public class RouteTableEntry
 	 * the destination or gateway */
 	private String interfaceName;
 	
-	
 	/** Cost to the final destination*/
 	private int cost;
 	
-	private long timeStamp;
-	
+	/** Last time which this entry was verified **/
+	private long timeStamp;	
 	
 	//private int timer = 0;
 	
@@ -112,4 +111,6 @@ public class RouteTableEntry
 	public void setTimeStamp(long timeStamp) {
 		this.timeStamp = timeStamp;
 	}
+
+
 }
