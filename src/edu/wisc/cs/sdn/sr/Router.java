@@ -420,6 +420,7 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 	 
 	// Find IP longest prefix match
 	int destinationIP = ipPacket.getDestinationAddress();
+		
 	
 	// find the IP address in the routing table with the longest prefix match by subtraction comparison
 	RouteTableEntry nextHop = null;
@@ -459,7 +460,6 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 			// TODO
 			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 0, null);
 		}
-		
 		
 		etherPacket.setPayload(ipPacket);
 		etherPacket.setDestinationMACAddress(entry.getMac().toBytes());
