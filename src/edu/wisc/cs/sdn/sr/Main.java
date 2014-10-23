@@ -102,7 +102,7 @@ public class Main
 
 		// Call router init (for RIP subsystem, etc.)
 		router.init();
-		
+		System.out.println("completed init");
 		// Read messages from the server until the server closes the connection
 		while (vnsComm.readFromServer());
 		
