@@ -305,10 +305,17 @@ public class RIP implements Runnable
 		
 		
 		// Split horizon
-        
-        // If one entry has as next hop this destination IP, remove it.
+ 
 		
-		for(RIPv2Entry ripEntry : ripPacket.getEntries().)
+		for(RIPv2Entry ripEntry : ripPacket.getEntries()){
+			
+			if(ripEntry.getNextHopAddress() == ipPacket.getDestinationAddress()) {
+				
+				ripPacket.getEntries().remove(ripEntry);
+				
+			}
+			
+		}
 		
 		
 		this.router.handlePacket(etherPacket, inIface);
