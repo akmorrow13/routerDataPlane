@@ -93,7 +93,7 @@ public class RIP implements Runnable
 
 		if(ripPacket.getCommand() == RIPv2.COMMAND_REQUEST) {// A new router is asking for my table.
 			
-			sendRIPResponseOneHost(etherPacket, inIface);
+			sendRIPResponseOneHost(etherPacket, inIface, RIPv2.COMMAND_RESPONSE);
 			
 		} else if (ripPacket.getCommand() == RIPv2.COMMAND_RESPONSE) { // The server should update your list and forward it to the other routers.
 			
@@ -208,9 +208,8 @@ public class RIP implements Runnable
      * Sends a RIP response to broadcast.
      */
 	public void sendRIPResponseBroadcast() {
-		
-		RIPv2 ripPacket = new RIPv2();
-		ripPacket = makeRipPacket(ripPacket.COMMAND_REQUEST);
+
+		RIPv2 ripPacket = makeRipPacket(RIPv2.COMMAND_RESPONSE);
 		UDP udpPacket = new UDP();
 		IPv4 ipPacket = new IPv4();;
 		Ethernet etherPacket = new Ethernet();
@@ -243,7 +242,7 @@ public class RIP implements Runnable
 			
 			etherPacket.setSourceMACAddress(iface.getMacAddress().toBytes());
 			
-			sendRIPResponseOneHost(etherPacket, iface);
+			this.router.handlePacket(etherPacket, iface);
 			
 		}
 		
@@ -255,7 +254,7 @@ public class RIP implements Runnable
      * @param etherPacket the Ethernet packet that was received
      * @param inIface the interface on which the packet was received
      */
-	public void sendRIPResponseOneHost(Ethernet etherPacket, Iface inIface){
+	public void sendRIPResponseOneHost(Ethernet etherPacket, Iface inIface, byte ripType){
 		
 		// Make sure it is in fact a RIP packet
         if (etherPacket.getEtherType() != Ethernet.TYPE_IPv4)
@@ -267,8 +266,7 @@ public class RIP implements Runnable
         if (udpPacket.getDestinationPort() != UDP.RIP_PORT)
         { return; }		
 		
-        RIPv2 ripPacket = new RIPv2();
-        ripPacket = makeRipPacket(ripPacket.COMMAND_RESPONSE);
+        RIPv2 ripPacket = makeRipPacket(RIPv2.COMMAND_RESPONSE);
 		
 		// RIPv2 works in Application layer, under UDP
 		
