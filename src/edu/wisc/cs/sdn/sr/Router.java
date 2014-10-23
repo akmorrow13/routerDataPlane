@@ -358,11 +358,15 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 		IPv4 ipPacket = (IPv4)etherPacket.getPayload();
 		int destinationIP = ipPacket.getDestinationAddress();
 		
-		if (destinationIP == RIP.RIP_MULTICAST_IP) {
+		if (destinationIP == RIP.RIP_MULTICAST_IP && etherPacket.getSourceMACAddress() != inIface.getMacAddress().toBytes()) {
+			
+			System.out.println("Entered point 1");
 			
 			multiCastResponse(etherPacket, inIface);
 			return;
 		}
+		
+		System.out.println("Entered point 2");
 		// Case 1: destined for interface
 		
 		boolean sentToInterface = false;
@@ -474,12 +478,29 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 }
 
 	private void multiCastResponse(Ethernet etherPacket, Iface inIface) {
-
 		
-		for (Iface iface : this.getInterfaces().values()) {
-		
-			etherPacket.setDestinationMACAddress(RIP.BROADCAST_MAC);
-			sendPacket(etherPacket, iface);
+		for(RouteTableEntry rtEntry : this.routeTable.getEntries()){
+			
+			// It is local interface.
+			
+			if (rtEntry.getGatewayAddress() == 0) {
+				
+				Iface iface = this.interfaces.get(rtEntry.getInterface());
+				
+				etherPacket.setSourceMACAddress(iface.getMacAddress().toBytes());
+				etherPacket.setDestinationMACAddress(RIP.BROADCAST_MAC);
+				
+				sendPacket(etherPacket, iface);
+				
+				System.out.println("Packet sent to broadcast.");
+				
+			} else { // Send to the next hop.
+				
+				IPv4 ipPacket = (IPv4)etherPacket.getPayload();
+				
+			}
+			
+			
 		}
 		
 	}

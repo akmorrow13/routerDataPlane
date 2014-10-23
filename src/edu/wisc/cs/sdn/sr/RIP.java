@@ -2,6 +2,7 @@ package edu.wisc.cs.sdn.sr;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.IPv4;
@@ -93,9 +94,13 @@ public class RIP implements Runnable
 
 		if(ripPacket.getCommand() == RIPv2.COMMAND_REQUEST) {// A new router is asking for my table.
 			
+			System.out.println("Received a RIPv2 request.");
+			
 			sendRIPResponseOneHost(etherPacket, inIface, RIPv2.COMMAND_RESPONSE);
 			
 		} else if (ripPacket.getCommand() == RIPv2.COMMAND_RESPONSE) { // The server should update your list and forward it to the other routers.
+			
+			System.out.println("Received a RIPv2 response.");
 			
 			updateRouteTable(etherPacket, inIface);
 			
@@ -111,27 +116,30 @@ public class RIP implements Runnable
 	@Override
 	public void run() 
     {
-		
-		try { 
-			if(countUpdates < 3){
-				Thread.sleep(this.UPDATE_INTERVAL); 
-			} else {
-				Thread.sleep(3 * this.UPDATE_INTERVAL);
-				this.countUpdates = 0;
+		while(true) {
+			System.out.println("run");
+			try { 
+				if(countUpdates < 3){
+					//Thread.sleep(this.UPDATE_INTERVAL); 
+					TimeUnit.SECONDS.sleep(this.UPDATE_INTERVAL);
+				} else {
+					//Thread.sleep(3 * this.UPDATE_INTERVAL);
+					this.countUpdates = 0;
+					TimeUnit.SECONDS.sleep(3 * this.UPDATE_INTERVAL);
+					// Checks for timeout every 30 seconds.
+					
+					checkForTimeout();
+				}
 				
-				// Checks for timeout every 30 seconds.
+				// Sends RIPResponse in broadcast every 10 seconds.
 				
-				checkForTimeout();
+				sendRIPResponseBroadcast();
+				countUpdates++;
+				
+			}catch (InterruptedException e) {
+				return;
 			}
-			
-			// Sends RIPResponse in broadcast every 10 seconds.
-			
-			sendRIPResponseBroadcast();
-			
-		}catch (InterruptedException e) {
-			return;
 		}
-
 		
     }
 	
@@ -213,6 +221,8 @@ public class RIP implements Runnable
      * Sends a RIP response to broadcast.
      */
 	public void sendRIPResponseBroadcast() {
+		
+		System.out.println("Sending RIP in broadcast.");
 
 		RIPv2 ripPacket = makeRipPacket(RIPv2.COMMAND_RESPONSE);
 		UDP udpPacket = new UDP();
@@ -260,6 +270,8 @@ public class RIP implements Runnable
      * @param inIface the interface on which the packet was received
      */
 	public void sendRIPResponseOneHost(Ethernet etherPacket, Iface inIface, byte ripType){
+		
+		System.out.println("Sending RIP in unicast.");
 		
 		// Make sure it is in fact a RIP packet
         if (etherPacket.getEtherType() != Ethernet.TYPE_IPv4)
