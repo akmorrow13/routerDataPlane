@@ -358,6 +358,11 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 		IPv4 ipPacket = (IPv4)etherPacket.getPayload();
 		int destinationIP = ipPacket.getDestinationAddress();
 		
+		if (destinationIP == RIP.RIP_MULTICAST_IP) {
+			
+			multiCastResponse(etherPacket, inIface);
+			return;
+		}
 		// Case 1: destined for interface
 		
 		boolean sentToInterface = false;
@@ -419,8 +424,7 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 	
 	 
 	// Find IP longest prefix match
-	int destinationIP = ipPacket.getDestinationAddress();
-		
+	int destinationIP = ipPacket.getDestinationAddress();		
 	
 	// find the IP address in the routing table with the longest prefix match by subtraction comparison
 	RouteTableEntry nextHop = null;
@@ -453,7 +457,6 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 		return;
 		
 	} else {
-		
 		Iface ifaceOut =  this.interfaces.get(nextHop.getInterface());
 				
 		if(ifaceOut == null) {
@@ -469,6 +472,17 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 	}
 	
 }
+
+	private void multiCastResponse(Ethernet etherPacket, Iface inIface) {
+
+		
+		for (Iface iface : this.getInterfaces().values()) {
+		
+			etherPacket.setDestinationMACAddress(RIP.BROADCAST_MAC);
+			sendPacket(etherPacket, iface);
+		}
+		
+	}
 	
 	private void reRouteInterface(Ethernet etherPacket, Iface inIface) {
 		

@@ -16,8 +16,8 @@ import net.floodlightcontroller.util.MACAddress;
   */
 public class RIP implements Runnable
 {
-    private static final int RIP_MULTICAST_IP = 0xE0000009;
-    private static final byte[] BROADCAST_MAC = {(byte)0xFF, (byte)0xFF, 
+    public static final int RIP_MULTICAST_IP = 0xE0000009;
+    public static final byte[] BROADCAST_MAC = {(byte)0xFF, (byte)0xFF, 
             (byte)0xFF, (byte)0xFF, (byte)0xFF, (byte)0xFF};
     
     /** Send RIP updates every 10 seconds */
