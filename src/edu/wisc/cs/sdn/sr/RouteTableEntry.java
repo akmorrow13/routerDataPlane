@@ -92,6 +92,7 @@ public class RouteTableEntry
         { result += "\t"; }
 		result += Util.intToDottedDecimal(maskAddress) + "\t";
 		result += interfaceName;
+		result += "\t\t  " + cost;
 		return result;
 	}
 

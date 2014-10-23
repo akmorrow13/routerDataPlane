@@ -117,16 +117,16 @@ public class RIP implements Runnable
 	public void run() 
     {
 		while(true) {
-			System.out.println("run");
+
 			try { 
 				if(countUpdates < 3){
-					TimeUnit.SECONDS.sleep(this.UPDATE_INTERVAL);
+					TimeUnit.SECONDS.sleep(RIP.UPDATE_INTERVAL);
 				} else {
 					
 					// Checks for timeout every 30 seconds.
 					
 					this.countUpdates = 0;
-					TimeUnit.SECONDS.sleep(3 * this.UPDATE_INTERVAL);
+					TimeUnit.SECONDS.sleep(3 * RIP.UPDATE_INTERVAL);
 					
 					
 					checkForTimeout();
@@ -194,14 +194,13 @@ public class RIP implements Runnable
 				newRtEntry  = new RouteTableEntry(ripEntry.getAddress(), ipPacket.getSourceAddress(), 
 						ripEntry.getSubnetMask(), inIface.getName());
 				
-				newRtEntry.setCost(ripEntry.getMetric());
+				newRtEntry.setCost(ripEntry.getMetric() + 1);
 				
 				if (rtEntry == null) {
 					
 					this.router.getRouteTable().addEntry(newRtEntry);
 					
 				} else {
-					
 	
 					// check if this is the most updated packet
 					// TODO: what else do we have to check for here?
@@ -215,11 +214,8 @@ public class RIP implements Runnable
 						
 						// If this RIP is not better than the current, drop it.
 						
-						return;
-						
 					}
 					
-					// TODO: split horizon issues
 				}
 								
 				
@@ -231,8 +227,6 @@ public class RIP implements Runnable
      * Sends a RIP response to broadcast.
      */
 	public void sendRIPResponseBroadcast() {
-		
-		System.out.println("Sending RIP in broadcast.");
 
 		RIPv2 ripPacket = makeRipPacket(RIPv2.COMMAND_RESPONSE);
 		UDP udpPacket = new UDP();
@@ -271,19 +265,16 @@ public class RIP implements Runnable
 				ipPacket.setSourceAddress(iface.getIpAddress());
 				
 				etherPacket.setSourceMACAddress(iface.getMacAddress().toBytes());
+				etherPacket.setDestinationMACAddress(RIP.BROADCAST_MAC);
 				
 				this.router.sendPacket(etherPacket, iface);
 				
-				System.out.println("Packet sent to broadcast.");
 				
 			} else { // Send to the next hop.
 				
-
-				// TODO 
-				// Actually I think that it is not necessary, because the router
-				// should advice only its neighbors.
-				
-				System.out.println("Packet should be send to IP.");
+				//IPv4 ipPacket = (IPv4)etherPacket.getPayload();
+				// I don't know if it is necessay, because I think that
+				// router should send messages only to its neighbors.
 				
 				
 			}
@@ -339,6 +330,7 @@ public class RIP implements Runnable
 		etherPacket.setSourceMACAddress(tempMac.toBytes());
 		
 		etherPacket.setPayload(ipPacket);
+		
 		
 		
 		// Split horizon
