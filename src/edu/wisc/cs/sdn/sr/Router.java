@@ -353,32 +353,22 @@ public class Router
 
 	
 private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
-	
 		
 		IPv4 ipPacket = (IPv4)etherPacket.getPayload();
 		int destinationIP = ipPacket.getDestinationAddress();
-		
-		if (destinationIP == RIP.RIP_MULTICAST_IP && etherPacket.getSourceMACAddress() != inIface.getMacAddress().toBytes()) {
-			
-			System.out.println("Entered point 1");
-			
-			multiCastResponse(etherPacket, inIface);
-			return;
-		}
-		
-		System.out.println("Entered point 2");
+
 		// Case 1: destined for interface
 		
 		boolean sentToInterface = false;
 		
 		for(Iface ifaceRouter : interfaces.values()){
 			
-			if (ifaceRouter.getIpAddress() == destinationIP){ // If the packer was sent to an router's interfaces.
+			if (ifaceRouter.getIpAddress() == destinationIP || RIP.RIP_MULTICAST_IP == destinationIP){ // If the packer was sent to an router's interfaces.
 				System.out.println("Packet addressed to one of my interfaces.");
 				reRouteInterface(etherPacket, inIface);
 				sentToInterface = true;
 				return;
-			}
+			} 
 		}
 		
 		// Case 2: destined to another IP.
@@ -393,7 +383,6 @@ private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 	}
 	
 private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
-	
 	
 	IPv4 ipPacket = null;
 	
@@ -418,6 +407,7 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 	} else {
 		
 		// If the TTL is 0, so the packet should be dropped.
+		// TODO Maybe it should send a ICMP message
 		
 		return;
 		
@@ -426,42 +416,53 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 	ipPacket.setChecksum((byte) 0);
 	ipPacket.serialize();
 	
-	 
-	// Find IP longest prefix match
-	int destinationIP = ipPacket.getDestinationAddress();		
 	
 	// find the IP address in the routing table with the longest prefix match by subtraction comparison
-	RouteTableEntry nextHop = null;
-	int lowerNumber = destinationIP;
+	RouteTableEntry rtEntry = this.routeTable.findBestEntry(ipPacket.getDestinationAddress());
 	
-	int subnet = 0;
-			
-	for (RouteTableEntry entry : routeTable.getEntries()) {
-		
-		subnet = entry.getDestinationAddress() & entry.getMaskAddress();
-		
-		if((destinationIP & entry.getMaskAddress()) == subnet){
-			int  tempDiff = Math.abs((destinationIP & entry.getMaskAddress()) - entry.getDestinationAddress());
-			if(tempDiff < lowerNumber) {
-				nextHop = entry;
-				lowerNumber = tempDiff;				
-			}
-		}	
-	}
+	ArpEntry entry = null;
 	
 	// retrieve the next-hop MAC address corresponding to the IP
-	ArpEntry entry = arpCache.lookup(nextHop.getDestinationAddress());
-	
-	if (entry == null) {
+	if(rtEntry != null) {
+		if(rtEntry.getGatewayAddress() == 0) { // It is a local interface.
+			
+			entry = arpCache.lookup(ipPacket.getDestinationAddress());
+			
+			if(entry == null) { // The router has not the MAC address of destination.
+				
+				this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), ipPacket.getDestinationAddress());
+				
+				return;
+			}
+			
+		} else {
+			
+			entry = arpCache.lookup(rtEntry.getGatewayAddress());
+			
+			if (entry == null) { // // The router has not the MAC address of nextHop.
+			
+				this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), rtEntry.getGatewayAddress());
+			
+				// TODO What to do while the router is trying to discover the MAC?
+			
+				return;
+			}
+			
+		}
+	}else { // There is no way to reach that IP.
 		
-		this.arpCache.waitForArp(etherPacket, this.interfaces.get(nextHop.getInterface()), nextHop.getDestinationAddress());
-		
-		// TODO What to do while the router is trying to discover the MAC?
+		System.out.println("There is no way to reach thar host.");
 		
 		return;
 		
-	} else {
-		Iface ifaceOut =  this.interfaces.get(nextHop.getInterface());
+		
+	}
+
+	if (entry != null) {
+		
+		System.out.println("Entry is not null.");
+		
+		Iface ifaceOut =  this.interfaces.get(rtEntry.getInterface());
 				
 		if(ifaceOut == null) {
 			// TODO
@@ -473,37 +474,13 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 		etherPacket.setSourceMACAddress(ifaceOut.getMacAddress().toBytes());
 		
 		sendPacket(etherPacket, ifaceOut);
-	}
-	
-}
-
-	private void multiCastResponse(Ethernet etherPacket, Iface inIface) {
 		
-		for(RouteTableEntry rtEntry : this.routeTable.getEntries()){
-			
-			// It is local interface.
-			
-			if (rtEntry.getGatewayAddress() == 0) {
-				
-				Iface iface = this.interfaces.get(rtEntry.getInterface());
-				
-				etherPacket.setSourceMACAddress(iface.getMacAddress().toBytes());
-				etherPacket.setDestinationMACAddress(RIP.BROADCAST_MAC);
-				
-				sendPacket(etherPacket, iface);
-				
-				System.out.println("Packet sent to broadcast.");
-				
-			} else { // Send to the next hop.
-				
-				IPv4 ipPacket = (IPv4)etherPacket.getPayload();
-				
-			}
-			
-			
+		System.out.println("Packet sent to a new IP.");
+		
 		}
-		
+	
 	}
+
 	
 	private void reRouteInterface(Ethernet etherPacket, Iface inIface) {
 		
@@ -526,7 +503,9 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 					
 					System.out.println("Received a echo request.");
 					// Send a echo reply to the source address.
+					
 					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 0, icmpPacket); 
+						
 					return;
 					
 				} else {
@@ -618,23 +597,19 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 	 * @param originIcmp is optional.
 	 */
 	void sendICMPMessage(int srcIp, int destIp, byte code, byte type, ICMP originIcmp){
-		
-		int netMask = Util.dottedDecimalToInt("255.255.255.255");
-		
-		ArpEntry arpEntry = this.arpCache.lookup(destIp);
-		
-		if(arpEntry == null) {
-			System.out.println("Unknown IP (it is not in the ArpCache).");
+	
+		RouteTableEntry rtEntry = this.routeTable.findBestEntry(destIp); // Get the route entry for this IP.
+
+		if(rtEntry == null) {
+			
+			System.out.println("No route to " + Util.intToDottedDecimal(destIp));
 			return;
+			
 		}
 		
-		RouteTableEntry rtEntry = this.routeTable.findEntry(destIp, netMask); // Get the route entry for this IP.
+		
 		Iface iface = this.interfaces.get(rtEntry.getInterface()); // Get the interface to reach this IP.
 		
-		MACAddress macDest = arpEntry.getMac(); 		
-		MACAddress macSrc = iface.getMacAddress();
-		
-		//int addrSrc = iface.getIpAddress();
 		
 		// Populate ICMP header
 
@@ -672,8 +647,8 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 		// Populate Ethernet header
 		Ethernet etherPacket = new Ethernet();
 		
-		etherPacket.setDestinationMACAddress(macDest.toBytes());
-		etherPacket.setSourceMACAddress(macSrc.toBytes());
+		etherPacket.setDestinationMACAddress(new byte[6]);
+		etherPacket.setSourceMACAddress(new byte[6]);
 		etherPacket.setEtherType(Ethernet.TYPE_IPv4);
 		
 		etherPacket.setPayload(ipPacket);
@@ -681,7 +656,7 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 		// Send ICMP request
 		System.out.println("Sending ICMP message");
 		
-		this.sendPacket(etherPacket, iface);
+		this.handlePacket(etherPacket, iface);
 		
 	}
 	

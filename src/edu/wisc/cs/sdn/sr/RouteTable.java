@@ -205,6 +205,35 @@ public class RouteTable
         }
         return null;
     }
+    
+    /**
+   	 * Find an entry in the route table with the longest prefix matching.
+   	 * @param dstIP destination IP of the entry to find
+     * @return The best entry found.
+   	 */
+    public RouteTableEntry findBestEntry(int dstIp) {
+    	RouteTableEntry res = null;
+    	int lowerNumber = dstIp;
+    	
+    	synchronized(this.entries){
+    		
+    		for (RouteTableEntry entry : this.entries){	
+    			
+    			if((dstIp & entry.getMaskAddress()) == entry.getDestinationAddress()) { // If it matches
+    				
+    				int  tempDiff = Math.abs((dstIp & entry.getMaskAddress()) - entry.getDestinationAddress());
+    				if(tempDiff < lowerNumber) {
+    					res = entry;
+    					lowerNumber = tempDiff;				
+    				}
+    				
+    			}			
+    		}
+        
+        }
+    	
+    	return res;
+    }
 
 	/**
 	 * Verify the interface specified in entries in the route table refer to 

@@ -120,13 +120,14 @@ public class RIP implements Runnable
 			System.out.println("run");
 			try { 
 				if(countUpdates < 3){
-					//Thread.sleep(this.UPDATE_INTERVAL); 
 					TimeUnit.SECONDS.sleep(this.UPDATE_INTERVAL);
 				} else {
-					//Thread.sleep(3 * this.UPDATE_INTERVAL);
+					
+					// Checks for timeout every 30 seconds.
+					
 					this.countUpdates = 0;
 					TimeUnit.SECONDS.sleep(3 * this.UPDATE_INTERVAL);
-					// Checks for timeout every 30 seconds.
+					
 					
 					checkForTimeout();
 				}
@@ -178,6 +179,9 @@ public class RIP implements Runnable
      */
 	public void updateRouteTable(Ethernet etherPacket, Iface inIface) {
 		
+		System.out.println("Updated route table.");
+		System.out.println(this.router.getRouteTable().toString());
+		
 		IPv4 ipPacket = (IPv4)etherPacket.getPayload();
 		UDP udpPacket = (UDP)ipPacket.getPayload();
 		RIPv2 ripPacket = (RIPv2)udpPacket.getPayload();
@@ -192,7 +196,12 @@ public class RIP implements Runnable
 				
 				newRtEntry.setCost(ripEntry.getMetric());
 				
-				if (rtEntry != null) {
+				if (rtEntry == null) {
+					
+					this.router.getRouteTable().addEntry(newRtEntry);
+					
+				} else {
+					
 	
 					// check if this is the most updated packet
 					// TODO: what else do we have to check for here?
@@ -200,18 +209,19 @@ public class RIP implements Runnable
 					if (rtEntry.getCost() > (ripEntry.getMetric() + 1)) {
 						
 						this.router.getRouteTable().removeEntry(rtEntry.getDestinationAddress(), rtEntry.getMaskAddress());
+						this.router.getRouteTable().addEntry(newRtEntry);
 						
 					} else {
 						
 						// If this RIP is not better than the current, drop it.
 						
 						return;
+						
 					}
 					
 					// TODO: split horizon issues
 				}
 								
-				this.router.getRouteTable().addEntry(newRtEntry);
 				
 			}
 		
@@ -230,8 +240,8 @@ public class RIP implements Runnable
 		Ethernet etherPacket = new Ethernet();
 		
 		
-		udpPacket.setDestinationPort(udpPacket.RIP_PORT);
-		udpPacket.setSourcePort(udpPacket.RIP_PORT);
+		udpPacket.setDestinationPort(UDP.RIP_PORT);
+		udpPacket.setSourcePort(UDP.RIP_PORT);
 		udpPacket.setPayload(ripPacket);
 		udpPacket.serialize();
 		
@@ -250,15 +260,33 @@ public class RIP implements Runnable
 		
 		// Getting all interfaces to send the ethernet packet.
 		
-		for(Iface iface : router.getInterfaces().values()) {
-		
-			ipPacket.setSourceAddress(iface.getIpAddress());
-			ipPacket.serialize();
+		for(RouteTableEntry rtEntry : this.router.getRouteTable().getEntries()) {
 			
-			etherPacket.setSourceMACAddress(iface.getMacAddress().toBytes());
+			// It is local interface.
 			
-			this.router.handlePacket(etherPacket, iface);
-			
+			if (rtEntry.getGatewayAddress() == 0) {
+				
+				Iface iface = this.router.getInterfaces().get(rtEntry.getInterface());
+				
+				ipPacket.setSourceAddress(iface.getIpAddress());
+				
+				etherPacket.setSourceMACAddress(iface.getMacAddress().toBytes());
+				
+				this.router.sendPacket(etherPacket, iface);
+				
+				System.out.println("Packet sent to broadcast.");
+				
+			} else { // Send to the next hop.
+				
+
+				// TODO 
+				// Actually I think that it is not necessary, because the router
+				// should advice only its neighbors.
+				
+				System.out.println("Packet should be send to IP.");
+				
+				
+			}
 		}
 		
 	}
@@ -311,7 +339,6 @@ public class RIP implements Runnable
 		etherPacket.setSourceMACAddress(tempMac.toBytes());
 		
 		etherPacket.setPayload(ipPacket);
-		
 		
 		
 		// Split horizon
