@@ -10,7 +10,6 @@ import net.floodlightcontroller.packet.IPv4;
 import net.floodlightcontroller.packet.RIPv2;
 import net.floodlightcontroller.packet.RIPv2Entry;
 import net.floodlightcontroller.packet.UDP;
-import net.floodlightcontroller.util.MACAddress;
 
 /**
   * Implements RIP. 
@@ -18,6 +17,10 @@ import net.floodlightcontroller.util.MACAddress;
   */
 public class RIP implements Runnable
 {
+	
+	public static final int INFINITE_COST = 17;
+	
+	
     public static final int RIP_MULTICAST_IP = 0xE0000009;
     public static final byte[] BROADCAST_MAC = {(byte)0xFF, (byte)0xFF, 
             (byte)0xFF, (byte)0xFF, (byte)0xFF, (byte)0xFF};
@@ -70,7 +73,8 @@ public class RIP implements Runnable
 
 		this.tasksThread.start();
 
-		sendRIPResponseBroadcast();
+		// Send RIP request in broadcast.
+		sendRIPRequestMulticast();
 		
 	}
 
@@ -135,7 +139,7 @@ public class RIP implements Runnable
 				
 				// Sends RIPResponse in broadcast every 10 seconds.
 				
-				sendRIPResponseBroadcast();
+				sendRIPResponseMulticast();
 				countUpdates++;
 				
 			}catch (InterruptedException e) {
@@ -175,8 +179,11 @@ public class RIP implements Runnable
 					// The line below generates a ConcurrentModificationException
 					
 					//this.router.getRouteTable().removeEntry(rtEntry.getDestinationAddress(), rtEntry.getMaskAddress());
-					System.out.println("Entry " + Util.intToDottedDecimal(rtEntry.getGatewayAddress()) + " timed out.");		
-					iterator.remove();
+					System.out.println("Entry " + Util.intToDottedDecimal(rtEntry.getGatewayAddress()) + " timed out.");
+					
+					rtEntry.setCost(17); // Set to infinte.
+					
+					//iterator.remove();
 					
 					shouldSendAdvice = true;
 					
@@ -187,7 +194,7 @@ public class RIP implements Runnable
 		// If some host timed out, the router should advice the others about that.
 		
 		if(shouldSendAdvice) {
-			sendRIPResponseBroadcast();
+			sendRIPResponseMulticast();
 		}
 		
 	}
@@ -217,14 +224,16 @@ public class RIP implements Runnable
 				newRtEntry.setCost(ripEntry.getMetric() + 1);
 				newRtEntry.setTimeStamp(System.currentTimeMillis());
 				
+				if(newRtEntry.getCost() >= INFINITE_COST) { // Infinite
+					// Drop this packet.
+					return;
+				}
+				
 				if (rtEntry == null) {
 					
 					this.router.getRouteTable().addEntry(newRtEntry);
 					
 				} else {
-	
-					// check if this is the most updated packet
-					// TODO: what else do we have to check for here?
 					
 					if (rtEntry.getCost() >= (ripEntry.getMetric() + 1)) {
 						
@@ -247,13 +256,73 @@ public class RIP implements Runnable
 	/**
      * Sends a RIP response to broadcast.
      */
-	public void sendRIPResponseBroadcast() {
+	public void sendRIPResponseMulticast() {
 
 		RIPv2 ripPacket = makeRipPacket(RIPv2.COMMAND_RESPONSE);
 		UDP udpPacket = new UDP();
 		IPv4 ipPacket = new IPv4();;
 		Ethernet etherPacket = new Ethernet();
 		
+		
+		udpPacket.setDestinationPort(UDP.RIP_PORT);
+		udpPacket.setSourcePort(UDP.RIP_PORT);
+		udpPacket.setPayload(ripPacket);
+		udpPacket.serialize();
+		
+		ipPacket.setDestinationAddress(RIP_MULTICAST_IP);
+		ipPacket.setProtocol(IPv4.PROTOCOL_UDP);
+		ipPacket.setTtl((byte) 64);
+		ipPacket.setVersion((byte) 4);
+		ipPacket.setFragmentOffset((byte) 0);
+		ipPacket.setFlags((byte) 2);
+		ipPacket.setChecksum((byte) 0);
+		ipPacket.setPayload(udpPacket);
+		
+		etherPacket.setDestinationMACAddress(BROADCAST_MAC);
+		etherPacket.setEtherType(Ethernet.TYPE_IPv4);
+		etherPacket.setPayload(ipPacket);
+		
+		// Getting all interfaces to send the ethernet packet.
+		
+		for(RouteTableEntry rtEntry : this.router.getRouteTable().getEntries()) {
+			
+			// It is local interface.
+			
+			if (rtEntry.getGatewayAddress() == 0) {
+				
+				Iface iface = this.router.getInterfaces().get(rtEntry.getInterface());
+				
+				ipPacket.setSourceAddress(iface.getIpAddress());
+				
+				etherPacket.setSourceMACAddress(iface.getMacAddress().toBytes());
+				etherPacket.setDestinationMACAddress(RIP.BROADCAST_MAC);
+				
+				this.router.sendPacket(etherPacket, iface);
+				
+				
+			} else { // Send to the next hop.
+				
+				//IPv4 ipPacket = (IPv4)etherPacket.getPayload();
+				// I don't know if it is necessay, because I think that
+				// router should send messages only to its neighbors.
+				
+				
+			}
+		}
+		
+	}
+	
+	/**
+     * Sends a RIP response to broadcast.
+     */
+	public void sendRIPRequestMulticast() {
+		// When a new router enter in the network, it should send a request to all its neighbors.
+		// TODO
+		
+		RIPv2 ripPacket = makeRipPacket(RIPv2.COMMAND_REQUEST);
+		UDP udpPacket = new UDP();
+		IPv4 ipPacket = new IPv4();;
+		Ethernet etherPacket = new Ethernet();
 		
 		udpPacket.setDestinationPort(UDP.RIP_PORT);
 		udpPacket.setSourcePort(UDP.RIP_PORT);
@@ -334,9 +403,8 @@ public class RIP implements Runnable
 		
 		// UDP over IP
 		
-		int tempIp = ipPacket.getDestinationAddress();
 		ipPacket.setDestinationAddress(ipPacket.getSourceAddress());
-		ipPacket.setSourceAddress(tempIp);
+		ipPacket.setSourceAddress(inIface.getIpAddress());
 		ipPacket.setTtl((byte) 64);
 		ipPacket.setChecksum((short) 0);
 		
@@ -346,15 +414,14 @@ public class RIP implements Runnable
 		
 		// IP over Ethernet
 		
-		MACAddress tempMac = etherPacket.getDestinationMAC();
 		etherPacket.setDestinationMACAddress(etherPacket.getSourceMACAddress());
-		etherPacket.setSourceMACAddress(tempMac.toBytes());
+		etherPacket.setSourceMACAddress(inIface.getMacAddress().toBytes());
 		
 		etherPacket.setPayload(ipPacket);
 		
 		
-		
 		// Split horizon
+		// TODO It is necessary to verify if this is necessary here.
  
 		
 		for(RIPv2Entry ripEntry : ripPacket.getEntries()){
