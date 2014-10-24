@@ -35,13 +35,7 @@ public class RIP implements Runnable
 	private Router router;
 
     /** Thread for periodic tasks */
-    private Thread tasksThread;
-    
-    
-    /** Helps in the relation between update and timeout  */
-    
-    private int countUpdates = 0;
-    
+    private Thread tasksThread;  
 
 	public RIP(Router router)
 	{ 
@@ -124,23 +118,14 @@ public class RIP implements Runnable
 		while(true) {
 
 			try { 
-				if(countUpdates < 3){
-					TimeUnit.SECONDS.sleep(RIP.UPDATE_INTERVAL);
+				TimeUnit.SECONDS.sleep(RIP.UPDATE_INTERVAL);
 
-				} else {
-					
-					// Checks for timeout every 30 seconds.
-					
-					this.countUpdates = 0;
-					TimeUnit.SECONDS.sleep(3 * RIP.UPDATE_INTERVAL);
-					
-					checkForTimeout();
-				}
+				// Sends updates and checks for timeout every 10 seconds.
+
 				
-				// Sends RIPResponse in broadcast every 10 seconds.
-				
+				checkForTimeout();
 				sendRIPResponseMulticast();
-				countUpdates++;
+				
 				
 			}catch (InterruptedException e) {
 				return;
