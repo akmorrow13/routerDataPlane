@@ -1,5 +1,6 @@
 package edu.wisc.cs.sdn.sr;
 
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -121,13 +122,13 @@ public class RIP implements Runnable
 			try { 
 				if(countUpdates < 3){
 					TimeUnit.SECONDS.sleep(RIP.UPDATE_INTERVAL);
+
 				} else {
 					
 					// Checks for timeout every 30 seconds.
 					
 					this.countUpdates = 0;
 					TimeUnit.SECONDS.sleep(3 * RIP.UPDATE_INTERVAL);
-					
 					
 					checkForTimeout();
 				}
@@ -148,26 +149,45 @@ public class RIP implements Runnable
 	/**
      * Checks if any entry in the route table timed out and remove it.
      */
-	public void checkForTimeout() {
+	private void checkForTimeout() {
 		
-		for (RouteTableEntry rtEntry : this.router.getRouteTable().getEntries()) {
+		boolean shouldSendAdvice = false;
+		
+		System.out.println("Checking for timeout.");
+		
+		Iterator<RouteTableEntry> iterator = this.router.getRouteTable().getEntries().iterator();
+		RouteTableEntry rtEntry = null;
+		
+		while (iterator.hasNext()) {
 			
 			// if an entry is a direct neighbor, do nothing
-			if (rtEntry.getCost() <= 1) {
+			rtEntry = iterator.next();
+			
+			if (rtEntry.getCost() < 1) {
 				
 				continue;
+				
 			} else {
 				
 				long currentTime = System.currentTimeMillis();
 				
 				if (currentTime - rtEntry.getTimStamp()  > (TIMEOUT * 1000)) {
-					this.router.getRouteTable().removeEntry(rtEntry.getDestinationAddress(), rtEntry.getMaskAddress());
+					// The line below generates a ConcurrentModificationException
 					
-					// TODO 
-					// Informs all the other routers about that.
+					//this.router.getRouteTable().removeEntry(rtEntry.getDestinationAddress(), rtEntry.getMaskAddress());
+					System.out.println("Entry " + Util.intToDottedDecimal(rtEntry.getGatewayAddress()) + " timed out.");		
+					iterator.remove();
+					
+					shouldSendAdvice = true;
 					
 				}
 			}
+		}
+		
+		// If some host timed out, the router should advice the others about that.
+		
+		if(shouldSendAdvice) {
+			sendRIPResponseBroadcast();
 		}
 		
 	}
@@ -195,6 +215,7 @@ public class RIP implements Runnable
 						ripEntry.getSubnetMask(), inIface.getName());
 				
 				newRtEntry.setCost(ripEntry.getMetric() + 1);
+				newRtEntry.setTimeStamp(System.currentTimeMillis());
 				
 				if (rtEntry == null) {
 					
@@ -205,7 +226,7 @@ public class RIP implements Runnable
 					// check if this is the most updated packet
 					// TODO: what else do we have to check for here?
 					
-					if (rtEntry.getCost() > (ripEntry.getMetric() + 1)) {
+					if (rtEntry.getCost() >= (ripEntry.getMetric() + 1)) {
 						
 						this.router.getRouteTable().removeEntry(rtEntry.getDestinationAddress(), rtEntry.getMaskAddress());
 						this.router.getRouteTable().addEntry(newRtEntry);

@@ -1,5 +1,8 @@
 package edu.wisc.cs.sdn.sr;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
 /**
  * An entry in a route table.
  * @author Aaron Gember-Jacobson and Anubhavnidhi Abhashkumar
@@ -92,7 +95,14 @@ public class RouteTableEntry
         { result += "\t"; }
 		result += Util.intToDottedDecimal(maskAddress) + "\t";
 		result += interfaceName;
-		result += "\t\t  " + cost;
+		result += "\t  " + cost;
+		
+		Date momentUpdate = new Date(timeStamp);
+		String time = new SimpleDateFormat("hh:mm:ss a").format(momentUpdate);
+	
+		
+		
+		result += "\t" + time;
 		return result;
 	}
 
