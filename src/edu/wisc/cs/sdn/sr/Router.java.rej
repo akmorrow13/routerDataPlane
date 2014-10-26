@@ -1,0 +1,16 @@
+--- src/edu/wisc/cs/sdn/sr/Router.java	2014-10-09 13:42:57.000000000 -0500
++++ src/edu/wisc/cs/sdn/sr/Router.java	2014-10-20 16:04:33.686638291 -0500
+@@ -252,9 +252,11 @@
+ 			{ break; }
+ 			
+ 			// Update ARP cache with contents of ARP reply
++		    int senderIp = ByteBuffer.wrap(
++				    arpPacket.getSenderProtocolAddress()).getInt();
+ 			ArpRequest request = this.arpCache.insert(
+-					new MACAddress(arpPacket.getTargetHardwareAddress()),
+-					targetIp);
++					new MACAddress(arpPacket.getSenderHardwareAddress()),
++					senderIp);
+ 			
+ 			// Process pending ARP request entry, if there is one
+ 			if (request != null)

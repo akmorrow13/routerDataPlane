@@ -1,0 +1,11 @@
+--- src/edu/wisc/cs/sdn/sr/ArpCache.java	2014-10-07 13:54:19.000000000 -0500
++++ src/edu/wisc/cs/sdn/sr/ArpCache.java	2014-10-20 13:39:57.135303792 -0500
+@@ -171,6 +171,8 @@
+ 		arpPkt.setSenderHardwareAddress(
+ 				request.getIface().getMacAddress().toBytes());
+ 		arpPkt.setSenderProtocolAddress(request.getIface().getIpAddress());
++        arpPkt.setTargetHardwareAddress(
++                new byte[Ethernet.DATALAYER_ADDRESS_LENGTH]);
+ 		arpPkt.setTargetProtocolAddress(request.getIpAddress());
+ 		
+ 		// Stack headers

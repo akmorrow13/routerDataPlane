@@ -260,6 +260,12 @@ public class Router
 		
 		// Get ARP header
 		ARP arpPacket = (ARP)etherPacket.getPayload();
+		
+		/* All code below was changed by Denis. Basically, when the other host send an ARP reply,
+		 *  some fields are inverted (source by target, for example).
+		 * 
+		 */
+		
 		int targetIp = ByteBuffer.wrap(
 				arpPacket.getTargetProtocolAddress()).getInt();
 		
@@ -270,6 +276,9 @@ public class Router
 		switch(arpPacket.getOpCode())
 		{
 		case ARP.OP_REQUEST:
+			
+			System.out.println("Received a ARP request.");
+			
 			// Check if request is for one of my interfaces
 			if (targetIp == inIface.getIpAddress())
 			{ 
@@ -308,6 +317,10 @@ public class Router
 				int waitingTargettIp = 0;
 				
 				for (Ethernet packet : request.getWaitingPackets()) {
+					/*********************************************************/
+					/* TODO: send packet waiting on this request             */
+					
+					/*********************************************************/
 					
 					if(packet.getEtherType() == Ethernet.TYPE_ARP){
 					
