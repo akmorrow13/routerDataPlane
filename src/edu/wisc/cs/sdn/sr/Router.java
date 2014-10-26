@@ -217,11 +217,6 @@ public class Router
 	{
 		System.out.println("*** -> Received packet: " +
                 etherPacket.toString().replace("\n", "\n\t"));
-		
-		/********************************************************************/
-		/* TODO: Handle packets                                             */
-		
-		/********************************************************************/
 
 		// Case 1: packet is of type ARP
 		if (etherPacket.getEtherType() == Ethernet.TYPE_ARP) {	
@@ -378,7 +373,6 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 	if (!verifyCheckSumIP(ipPacket)) {
 		 // corrupt packet. Error
 		sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 0, null);
-		// TODO
 		return;
 	 }
 	 
@@ -392,8 +386,8 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 	} else {
 		
 		// If the TTL is 0, so the packet should be dropped.
-		// TODO Maybe it should send a ICMP message
-		
+		// send time exceeded ICMP message
+		sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 11, null);
 		return;
 		
 	}
@@ -416,7 +410,8 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 			if(entry == null) { // The router has not the MAC address of destination.
 				
 				this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), ipPacket.getDestinationAddress());
-				
+				// send ICMP message for dropped packet
+				sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, null);
 				return;
 			}
 			
@@ -428,21 +423,22 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 			
 				this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), rtEntry.getGatewayAddress());
 			
-				// TODO What to do while the router is trying to discover the MAC?
-			
+				// send ICMP host unreachable
+				sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, null);
 				return;
 			}
 			
 		}
-	}else { // There is no way to reach that IP.
+	} else { // There is no way to reach that IP.
 		
-		System.out.println("There is no way to reach thar host.");
+		System.out.println("There is no way to reach host.");
 		
 		return;
 		
 		
 	}
 
+	entry = arpCache.lookup(ipPacket.getDestinationAddress());
 	if (entry != null) {
 		
 		System.out.println("Entry is not null.");
@@ -450,8 +446,8 @@ private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 		Iface ifaceOut =  this.interfaces.get(rtEntry.getInterface());
 				
 		if(ifaceOut == null) {
-			// TODO
-			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 0, null);
+			
+			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, null);
 		}
 		
 		etherPacket.setPayload(ipPacket);

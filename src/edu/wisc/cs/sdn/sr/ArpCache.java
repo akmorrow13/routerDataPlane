@@ -1,3 +1,4 @@
+
 package edu.wisc.cs.sdn.sr;
 
 import java.util.Map;
@@ -101,7 +102,7 @@ public class ArpCache implements Runnable
 
 			for(Integer waitingRequestIP : this.requests.keySet()){
 				if(this.requests.get(waitingRequestIP).getIpAddress() == requestAddress){
-					
+					// send ICMP host unreachable to source
 					this.requests.remove(requestAddress);
 
 				}
@@ -238,5 +239,6 @@ public class ArpCache implements Runnable
 		System.out.println("Send ARP reply");
 		System.out.println(arpReply.toString());
 		this.router.sendPacket(etherReply, iface);
+		
 	}
 }
