@@ -49,7 +49,7 @@ public class RIP implements Runnable
         if (this.router.getRouteTable().getEntries().size() > 0)
         { return; }
 
-        System.out.println("RIP: Build initial routing table");
+        //System.out.println("RIP: Build initial routing table");
         for(Iface iface : this.router.getInterfaces().values())
         {
         	
@@ -63,7 +63,7 @@ public class RIP implements Runnable
             rtEntry.setCost(0);
             
         }
-        System.out.println("Route Table:\n"+this.router.getRouteTable());
+        //System.out.println("Route Table:\n"+this.router.getRouteTable());
 
 		this.tasksThread.start();
 
@@ -93,13 +93,13 @@ public class RIP implements Runnable
 
 		if(ripPacket.getCommand() == RIPv2.COMMAND_REQUEST) {// A new router is asking for my table.
 			
-			System.out.println("Received a RIPv2 request.");
+			//System.out.println("Received a RIPv2 request.");
 			
 			sendRIPResponseOneHost(etherPacket, inIface, RIPv2.COMMAND_RESPONSE);
 			
 		} else if (ripPacket.getCommand() == RIPv2.COMMAND_RESPONSE) { // The server should update your list and forward it to the other routers.
 			
-			System.out.println("Received a RIPv2 response.");
+			//System.out.println("Received a RIPv2 response.");
 			
 			updateRouteTable(etherPacket, inIface);
 			
@@ -141,7 +141,7 @@ public class RIP implements Runnable
 		
 		boolean shouldSendAdvice = false;
 		
-		System.out.println("Checking for timeout.");
+		//System.out.println("Checking for timeout.");
 		
 		Iterator<RouteTableEntry> iterator = this.router.getRouteTable().getEntries().iterator();
 		RouteTableEntry rtEntry = null;
@@ -163,7 +163,7 @@ public class RIP implements Runnable
 					// The line below generates a ConcurrentModificationException
 					
 					//this.router.getRouteTable().removeEntry(rtEntry.getDestinationAddress(), rtEntry.getMaskAddress());
-					System.out.println("Entry " + Util.intToDottedDecimal(rtEntry.getGatewayAddress()) + " timed out.");
+					//System.out.println("Entry " + Util.intToDottedDecimal(rtEntry.getGatewayAddress()) + " timed out.");
 					
 					rtEntry.setCost(17); // Set to infinte.
 					
@@ -329,7 +329,7 @@ public class RIP implements Runnable
      */
 	public void sendRIPResponseOneHost(Ethernet etherPacket, Iface inIface, byte ripType){
 		
-		System.out.println("Sending RIP in unicast.");
+		//System.out.println("Sending RIP in unicast.");
 		
 		// Make sure it is in fact a RIP packet
         if (etherPacket.getEtherType() != Ethernet.TYPE_IPv4)
