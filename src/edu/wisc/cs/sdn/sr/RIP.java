@@ -279,24 +279,42 @@ public class RIP implements Runnable
 		etherPacket.setEtherType(Ethernet.TYPE_IPv4);
 		etherPacket.setPayload(ipPacket);
 		
-		// TODO The split horizon should be implemented below.
+		// TODO The split horizon is implemented below, but I couldn't test it yet.
 		
-		for(RouteTableEntry rtEntry : this.router.getRouteTable().getEntries()) {
+		RIPv2 ripPacketCopy = (RIPv2) ripPacket.clone();
+		
+		for(Iface iface : this.router.getInterfaces().values()) {
 			
-			if (rtEntry.getGatewayAddress() == 0) { // It is a local interface.
+			ripPacket = (RIPv2) ripPacketCopy.clone();
+			
+			for(RouteTableEntry rtEntry : this.router.getRouteTable().getEntries()) {
 				
-				Iface iface = this.router.getInterfaces().get(rtEntry.getInterface());
-				
-				ipPacket.setSourceAddress(iface.getIpAddress());
-				
-				etherPacket.setSourceMACAddress(iface.getMacAddress().toBytes());
-				etherPacket.setDestinationMACAddress(RIP.BROADCAST_MAC);
-				
-				this.router.sendPacket(etherPacket, iface);
+				if(rtEntry.getInterface().equals(iface.getName()) && rtEntry.getGatewayAddress() != 0) { // Non local entry found.
+					
+					for(RIPv2Entry ripEntry : ripPacket.getEntries()) {
+						if(ripEntry.getNextHopAddress() == rtEntry.getGatewayAddress()) {
+							
+							// Remove from my RIP packet that the destination can reach a network using me, 
+							// because, actually, I learned this route from it.
+							
+							ripPacket.getEntries().remove(ripEntry); 
+						}
+					}
+					
+					
+				}
+			}
+	
+
+			ipPacket.setSourceAddress(iface.getIpAddress());
+			
+			etherPacket.setSourceMACAddress(iface.getMacAddress().toBytes());
+			etherPacket.setDestinationMACAddress(RIP.BROADCAST_MAC);
+			
+			this.router.sendPacket(etherPacket, iface);
 				
 				
 			} 
-		}
 		
 	}
 	
@@ -393,10 +411,6 @@ public class RIP implements Runnable
 			
 			ripEntry.setMetric(rtEntry.getCost());
 			
-			// One way to identify the router (in the future, to avoid the count to infinite).
-			// Sincerely, I don't know how to idenfity it (maybe a new attribute).
-			
-			//ripEntry.setRouteTag((short)(this.router.hashCode()));
 			ripEntry.setRouteTag(this.router.getTopo());
 			
 			// lookup the next hop address
