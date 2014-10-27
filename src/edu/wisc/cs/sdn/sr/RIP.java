@@ -68,7 +68,7 @@ public class RIP implements Runnable
 		this.tasksThread.start();
 
 		// Send RIP request in broadcast.
-		sendRIPRequestMulticast();
+		sendRIPMessageMulticast(RIPv2.COMMAND_REQUEST);
 		
 	}
 
@@ -122,9 +122,8 @@ public class RIP implements Runnable
 
 				// Sends updates and checks for timeout every 10 seconds.
 
-				
 				checkForTimeout();
-				sendRIPResponseMulticast();
+				sendRIPMessageMulticast(RIPv2.COMMAND_RESPONSE);
 				
 				
 			}catch (InterruptedException e) {
@@ -179,7 +178,7 @@ public class RIP implements Runnable
 		// If some host timed out, the router should advice the others about that.
 		
 		if(shouldSendAdvice) {
-			sendRIPResponseMulticast();
+			sendRIPMessageMulticast(RIPv2.COMMAND_RESPONSE);
 		}
 		
 	}
@@ -237,17 +236,30 @@ public class RIP implements Runnable
 			}
 		
 	}
-	
-	/**
-     * Sends a RIP response to broadcast.
-     */
-	public void sendRIPResponseMulticast() {
 
-		RIPv2 ripPacket = makeRipPacket(RIPv2.COMMAND_RESPONSE);
+	
+	/**
+     * Sends a RIP message to multicast.
+     */
+	
+	public void sendRIPMessageMulticast(byte ripType) {
+		
+		RIPv2 ripPacket = null;
+		
+		if(ripType == RIPv2.COMMAND_REQUEST) {
+			ripPacket = makeRipPacket(RIPv2.COMMAND_REQUEST);
+			
+		} else if (ripType == RIPv2.COMMAND_RESPONSE) {
+			ripPacket = makeRipPacket(RIPv2.COMMAND_RESPONSE);
+			
+		} else {
+			return;
+		}
+	
+		
 		UDP udpPacket = new UDP();
 		IPv4 ipPacket = new IPv4();;
 		Ethernet etherPacket = new Ethernet();
-		
 		
 		udpPacket.setDestinationPort(UDP.RIP_PORT);
 		udpPacket.setSourcePort(UDP.RIP_PORT);
@@ -267,13 +279,11 @@ public class RIP implements Runnable
 		etherPacket.setEtherType(Ethernet.TYPE_IPv4);
 		etherPacket.setPayload(ipPacket);
 		
-		// Getting all interfaces to send the ethernet packet.
+		// TODO The split horizon should be implemented below.
 		
 		for(RouteTableEntry rtEntry : this.router.getRouteTable().getEntries()) {
 			
-			// It is local interface.
-			
-			if (rtEntry.getGatewayAddress() == 0) {
+			if (rtEntry.getGatewayAddress() == 0) { // It is a local interface.
 				
 				Iface iface = this.router.getInterfaces().get(rtEntry.getInterface());
 				
@@ -285,77 +295,13 @@ public class RIP implements Runnable
 				this.router.sendPacket(etherPacket, iface);
 				
 				
-			} else { // Send to the next hop.
-				
-				//IPv4 ipPacket = (IPv4)etherPacket.getPayload();
-				// I don't know if it is necessay, because I think that
-				// router should send messages only to its neighbors.
-				
-				
-			}
+			} 
 		}
 		
 	}
 	
-	/**
-     * Sends a RIP response to broadcast.
-     */
-	public void sendRIPRequestMulticast() {
-		// When a new router enter in the network, it should send a request to all its neighbors.
-		// TODO
-		
-		RIPv2 ripPacket = makeRipPacket(RIPv2.COMMAND_REQUEST);
-		UDP udpPacket = new UDP();
-		IPv4 ipPacket = new IPv4();;
-		Ethernet etherPacket = new Ethernet();
-		
-		udpPacket.setDestinationPort(UDP.RIP_PORT);
-		udpPacket.setSourcePort(UDP.RIP_PORT);
-		udpPacket.setPayload(ripPacket);
-		udpPacket.serialize();
-		
-		ipPacket.setDestinationAddress(RIP_MULTICAST_IP);
-		ipPacket.setProtocol(IPv4.PROTOCOL_UDP);
-		ipPacket.setTtl((byte) 64);
-		ipPacket.setVersion((byte) 4);
-		ipPacket.setFragmentOffset((byte) 0);
-		ipPacket.setFlags((byte) 2);
-		ipPacket.setChecksum((byte) 0);
-		ipPacket.setPayload(udpPacket);
-		
-		etherPacket.setDestinationMACAddress(BROADCAST_MAC);
-		etherPacket.setEtherType(Ethernet.TYPE_IPv4);
-		etherPacket.setPayload(ipPacket);
-		
-		// Getting all interfaces to send the ethernet packet.
-		
-		for(RouteTableEntry rtEntry : this.router.getRouteTable().getEntries()) {
-			
-			// It is local interface.
-			
-			if (rtEntry.getGatewayAddress() == 0) {
-				
-				Iface iface = this.router.getInterfaces().get(rtEntry.getInterface());
-				
-				ipPacket.setSourceAddress(iface.getIpAddress());
-				
-				etherPacket.setSourceMACAddress(iface.getMacAddress().toBytes());
-				etherPacket.setDestinationMACAddress(RIP.BROADCAST_MAC);
-				
-				this.router.sendPacket(etherPacket, iface);
-				
-				
-			} else { // Send to the next hop.
-				
-				//IPv4 ipPacket = (IPv4)etherPacket.getPayload();
-				// I don't know if it is necessay, because I think that
-				// router should send messages only to its neighbors.
-				
-				
-			}
-		}
-		
-	}
+	
+	
 	
 	
 	/**
@@ -404,9 +350,7 @@ public class RIP implements Runnable
 		
 		etherPacket.setPayload(ipPacket);
 		
-		
-		// Split horizon
-		// TODO It is necessary to verify if this is necessary here.
+		// Split to horizon
  
 		
 		for(RIPv2Entry ripEntry : ripPacket.getEntries()){
