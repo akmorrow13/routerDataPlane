@@ -9,6 +9,7 @@ import edu.wisc.cs.sdn.sr.vns.VNSComm;
 import net.floodlightcontroller.packet.ARP;
 import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.ICMP;
+import net.floodlightcontroller.packet.IPacket;
 import net.floodlightcontroller.packet.IPv4;
 import net.floodlightcontroller.packet.UDP;
 import net.floodlightcontroller.util.MACAddress;
@@ -373,7 +374,6 @@ public class Router
 
 		if (!verifyCheckSumIP(ipPacket)) {
 			// corrupt packet. Error
-			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 0, null);
 			System.out.println("Correupted packet.");
 			return;
 		}
@@ -390,7 +390,15 @@ public class Router
 			// If the TTL is 0, so the packet should be dropped.
 			// send time exceeded ICMP message
 			System.out.println("TTL expired");
-			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 11, null);
+			
+			// TODO: I changed this, not sure if it is right
+			int payloadLength = ipPacket.getHeaderLength() + 8;
+			// get IP header and first 8 bytes of ether payload
+			byte[] data = etherPacket.getPayload().serialize();
+			
+			IPacket packet = new Ethernet();
+			IPacket icmpPacket = packet.deserialize(data, 0, payloadLength);
+			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 11, icmpPacket);
 			return;
 
 		}
@@ -417,7 +425,13 @@ public class Router
 					this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), ipPacket.getDestinationAddress());
 
 					// send ICMP host unreachable
-					//sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, (ICMP)ipPacket.getPayload());	
+					int payloadLength = ipPacket.getHeaderLength() + 8;
+					// get IP header and first 8 bytes of ether payload
+					byte[] data = etherPacket.getPayload().serialize();
+					
+					IPacket packet = new Ethernet();
+					IPacket icmpPacket = packet.deserialize(data, 0, payloadLength);
+					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, icmpPacket);	
 					return;
 				}	
 
@@ -431,7 +445,13 @@ public class Router
 					this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), rtEntry.getGatewayAddress());
 
 					// send ICMP host unreachable
-					//sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, (ICMP)ipPacket.getPayload());
+					int payloadLength = ipPacket.getHeaderLength() + 8;
+					// get IP header and first 8 bytes of ether payload
+					byte[] data = etherPacket.getPayload().serialize();
+					
+					IPacket packet = new Ethernet();
+					IPacket icmpPacket = packet.deserialize(data, 0, payloadLength);
+					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, icmpPacket);
 					return;
 
 				}
@@ -477,7 +497,7 @@ public class Router
 					System.out.println("Received a echo request.");
 					// Send a echo reply to the source address.
 
-					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 0, icmpPacket); 
+					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 0, etherPacket.getPayload()); 
 
 					return;
 
@@ -499,12 +519,22 @@ public class Router
 				System.out.println("Received a 520 UDP");
 				rip.handlePacket(etherPacket, inIface);
 			} else {
-				sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 3, (byte) 3, icmpPacket); // Port unreachable
+				int payloadLength = ipPacket.getHeaderLength() + 8;
+				// get IP header and first 8 bytes of ether payload
+				byte[] data = etherPacket.getPayload().serialize();
+				
+				IPacket icmpPack = icmpPacket.deserialize(data, 0, payloadLength);
+				sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 3, (byte) 3, icmpPack); // Port unreachable
 			}
 
 		} else if (ipPacket.getProtocol() == IPv4.PROTOCOL_TCP) {
 			System.out.println("Received a TCP.");
-			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 3, (byte) 3, icmpPacket); // Port unreachable
+			int payloadLength = ipPacket.getHeaderLength() + 8;
+			// get IP header and first 8 bytes of ether payload
+			byte[] data = etherPacket.getPayload().serialize();
+			
+			IPacket icmpPack = icmpPacket.deserialize(data, 0, payloadLength);
+			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 3, (byte) 3, icmpPack); // Port unreachable
 
 		} else {
 			// Ignore the packet.
@@ -569,7 +599,7 @@ public class Router
 	 * @param iface interface on which the request packet was received
 	 * @param originIcmp is optional.
 	 */
-	void sendICMPMessage(int srcIp, int destIp, byte code, byte type, ICMP originIcmp){
+	void sendICMPMessage(int srcIp, int destIp, byte code, byte type, IPacket packet){
 
 		RouteTableEntry rtEntry = this.routeTable.findBestEntry(destIp); // Get the route entry for this IP.
 
@@ -592,8 +622,10 @@ public class Router
 		icmpPacket.setIcmpType(type);
 		icmpPacket.setChecksum((short) 0);
 
-		if(originIcmp != null){
-			icmpPacket.setPayload(originIcmp.getPayload());
+		if(packet != null){
+		//	icmpPacket.setPayload(originIcmp.getPayload());
+			// I think this is wrong we need to add more stuff
+			icmpPacket.setPayload(packet);
 		}
 
 		icmpPacket.serialize();
