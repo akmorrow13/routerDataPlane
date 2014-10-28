@@ -391,14 +391,12 @@ public class Router
 			// send time exceeded ICMP message
 			System.out.println("TTL expired");
 			
-			// TODO: I changed this, not sure if it is right
 			int payloadLength = ipPacket.getHeaderLength() + 8;
 			// get IP header and first 8 bytes of ether payload
-			byte[] data = etherPacket.getPayload().serialize();
-			
-			IPacket packet = new Ethernet();
-			IPacket icmpPacket = packet.deserialize(data, 0, payloadLength);
-			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 11, icmpPacket);
+			IPacket packet = etherPacket.getPayload();
+			byte[] data = packet.serialize();
+			//packet.deserialize(data, 0, payloadLength);
+			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 11, packet);
 			return;
 
 		}
@@ -450,11 +448,10 @@ public class Router
 					// send ICMP host unreachable
 					int payloadLength = ipPacket.getHeaderLength() + 8;
 					// get IP header and first 8 bytes of ether payload
-					byte[] data = ipPacket.serialize();
-					
-					IPacket packet = new Ethernet();
-					IPacket icmpPacket = packet.deserialize(data, 0, payloadLength);
-					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, icmpPacket);
+					IPacket packet = etherPacket.getPayload();
+					byte[] data = packet.serialize();
+					//packet.deserialize(data, 0, payloadLength);
+					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, packet);
 					return;
 
 				}
@@ -524,20 +521,20 @@ public class Router
 			} else {
 				int payloadLength = ipPacket.getHeaderLength() + 8;
 				// get IP header and first 8 bytes of ether payload
-				byte[] data = etherPacket.getPayload().serialize();
-				
-				IPacket icmpPack = icmpPacket.deserialize(data, 0, payloadLength);
-				sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 3, (byte) 3, icmpPack); // Port unreachable
+				IPacket packet = etherPacket.getPayload();
+				byte[] data = packet.serialize();
+				packet.deserialize(data, 0, payloadLength);
+				sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 3, (byte) 3, packet); // Port unreachable
 			}
 
 		} else if (ipPacket.getProtocol() == IPv4.PROTOCOL_TCP) {
 			System.out.println("Received a TCP.");
 			int payloadLength = ipPacket.getHeaderLength() + 8;
 			// get IP header and first 8 bytes of ether payload
-			byte[] data = etherPacket.getPayload().serialize();
-			
-			IPacket icmpPack = icmpPacket.deserialize(data, 0, payloadLength);
-			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 3, (byte) 3, icmpPack); // Port unreachable
+			IPacket packet = etherPacket.getPayload();
+			byte[] data = packet.serialize();
+			packet.deserialize(data, 0, payloadLength);
+			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 3, (byte) 3, packet); // Port unreachable
 
 		} else {
 			// Ignore the packet.
