@@ -425,13 +425,16 @@ public class Router
 					this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), ipPacket.getDestinationAddress());
 
 					// send ICMP host unreachable
-					int payloadLength = ipPacket.getHeaderLength() + 8;
-					// get IP header and first 8 bytes of ether payload
-					byte[] data = etherPacket.getPayload().serialize();
 					
-					IPacket packet = new Ethernet();
-					IPacket icmpPacket = packet.deserialize(data, 0, payloadLength);
-					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, icmpPacket);	
+					// get length of payload
+					int payloadLength = ipPacket.getHeaderLength() + 8;
+					
+					// get IP header and first 8 bytes of ether payload
+					// send it out in sendICMPmessage
+					IPacket packet = etherPacket.getPayload();
+					byte[] data = packet.serialize();
+					packet.deserialize(data, 0, payloadLength);
+					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, packet);	
 					return;
 				}	
 
@@ -447,7 +450,7 @@ public class Router
 					// send ICMP host unreachable
 					int payloadLength = ipPacket.getHeaderLength() + 8;
 					// get IP header and first 8 bytes of ether payload
-					byte[] data = etherPacket.getPayload().serialize();
+					byte[] data = ipPacket.serialize();
 					
 					IPacket packet = new Ethernet();
 					IPacket icmpPacket = packet.deserialize(data, 0, payloadLength);
