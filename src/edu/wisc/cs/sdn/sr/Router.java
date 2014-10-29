@@ -7,6 +7,7 @@ import java.util.Map;
 import edu.wisc.cs.sdn.sr.vns.VNSComm;
 
 import net.floodlightcontroller.packet.ARP;
+import net.floodlightcontroller.packet.Data;
 import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.ICMP;
 import net.floodlightcontroller.packet.IPacket;
@@ -295,7 +296,10 @@ public class Router
 			ArpRequest request = this.arpCache.insert(
 					new MACAddress(arpPacket.getSenderHardwareAddress()),
 					sourceIp);
-
+			
+			this.arpCache.removeRequest(sourceIp);		
+			
+			/*
 			// Process pending ARP request entry, if there is one
 			if (request != null)
 			{
@@ -317,10 +321,11 @@ public class Router
 
 						/* In this moment, the Router received the reply after sending a ARP request via broadcast.
 						 * Then, the ArpCache was filled with the pair MAC-IP and that request has to be removed from the waiting list.
-						 */
+						 
 
 						if(sourceIp == waitingTargettIp){ // Check if that ARP request left from my interface.
 							request.getWaitingPackets().remove(packet); // Remove the packet from the waiting list.
+							System.out.println("------------------Removed-----------------");
 						}
 
 					}
@@ -328,6 +333,7 @@ public class Router
 
 				}
 			}
+			*/
 			break;
 		}
 	}
@@ -398,10 +404,13 @@ public class Router
 			bb.get(payloadBytes, 0, 8);
 			
 			IPv4 ipClone = (IPv4) ipPacket.clone();
-			ICMP tempIcmpPacket = new ICMP();
-			tempIcmpPacket.deserialize(payloadBytes, 0, 8);
 			
-			ipClone.setPayload(tempIcmpPacket);
+			Data data = new Data();
+			data.setData(payloadBytes);
+			
+			//tempIcmpPacket.deserialize(payloadBytes, 0, 8);
+
+			ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
 			
 			
 			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 11, ipClone);
@@ -437,13 +446,15 @@ public class Router
 					bb.get(payloadBytes, 0, 8);
 					
 					IPv4 ipClone = (IPv4) ipPacket.clone();
-					ICMP tempIcmpPacket = new ICMP();
-					tempIcmpPacket.deserialize(payloadBytes, 0, 8);
 					
-					ipClone.setPayload(tempIcmpPacket);
+					Data data = new Data();
+					data.setData(payloadBytes);
 					
+					//tempIcmpPacket.deserialize(payloadBytes, 0, 8);
+
+					ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
 					
-					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, ipClone);
+					//sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, ipClone);
 					return;
 				}	
 
@@ -455,7 +466,6 @@ public class Router
 				if (entry == null) { // The router has not the MAC address of nextHop.
 
 					this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), rtEntry.getGatewayAddress());
-
 					byte[] payloadBytes = new byte[8];
 					
 					ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
@@ -463,17 +473,20 @@ public class Router
 					bb.get(payloadBytes, 0, 8);
 					
 					IPv4 ipClone = (IPv4) ipPacket.clone();
-					ICMP tempIcmpPacket = new ICMP();
-					tempIcmpPacket.deserialize(payloadBytes, 0, 8);
 					
-					ipClone.setPayload(tempIcmpPacket);
+					Data data = new Data();
+					data.setData(payloadBytes);
+					
+					//tempIcmpPacket.deserialize(payloadBytes, 0, 8);
+
+					ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
 					
 					
 					
 					//iPacket.deserialize(payloadBytes, 0, totalLength);
 					
 					
-					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, ipClone);
+					//sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, ipClone);
 					return;
 
 				}
@@ -482,6 +495,23 @@ public class Router
 
 		} else {
 			System.out.println("There is no way to reach host.");
+			
+			byte[] payloadBytes = new byte[8];
+			
+			ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
+			
+			bb.get(payloadBytes, 0, 8);
+			
+			IPv4 ipClone = (IPv4) ipPacket.clone();
+			
+			Data data = new Data();
+			data.setData(payloadBytes);
+			
+			//tempIcmpPacket.deserialize(payloadBytes, 0, 8);
+
+			ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
+			
+			sendICMPMessage(inIface.getIpAddress(), ipPacket.getSourceAddress(), (byte) 7, (byte) 3, ipClone);
 
 			return;
 		}
@@ -518,8 +548,10 @@ public class Router
 
 					System.out.println("Received a echo request.");
 					// Send a echo reply to the source address.
-
-					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 0, etherPacket.getPayload()); 
+					
+					// We are using the payload of the original ICMP packet instead of the IP header plus its payload.
+					
+					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 0, icmpPacket.getPayload()); 
 
 					return;
 
@@ -549,11 +581,13 @@ public class Router
 				bb.get(payloadBytes, 0, 8);
 				
 				IPv4 ipClone = (IPv4) ipPacket.clone();
-				ICMP tempIcmpPacket = new ICMP();
-				tempIcmpPacket.deserialize(payloadBytes, 0, 8);
 				
-				ipClone.setPayload(tempIcmpPacket);
+				Data data = new Data();
+				data.setData(payloadBytes);
 				
+				//tempIcmpPacket.deserialize(payloadBytes, 0, 8);
+
+				ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
 				
 				sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 3, (byte) 3, ipClone); // Port unreachable
 			}
@@ -605,7 +639,6 @@ public class Router
 		}
 
 	}
-
 
 
 	/**
@@ -660,14 +693,45 @@ public class Router
 		icmpPacket.setIcmpCode(code);
 		icmpPacket.setIcmpType(type);
 		icmpPacket.setChecksum((short) 0);
-
-		if(iPacket != null){
+				
+		if(type == 3) {
+			
+			byte[] data = new byte[32];
+			
+			ByteBuffer bb = ByteBuffer.wrap(data);			
+			
+			bb.putShort((short) 0);
+			bb.putShort((short) 1500);
+			bb.put(iPacket.serialize());
+			
+			Data newData = new Data();
+			newData.setData(data);
+			
+			icmpPacket.setPayload(newData);
+						
+			
+		} else if(type == 11) {
+			
+			// TODO
+			
+		} else if(type == 0) {
+			if(iPacket != null){
+				//	icmpPacket.setPayload(originIcmp.getPayload());
+					// I think this is wrong we need to add more stuff
+					icmpPacket.setPayload(iPacket);
+				}
+		}
+		
+		
+		//if(iPacket != null){
 		//	icmpPacket.setPayload(originIcmp.getPayload());
 			// I think this is wrong we need to add more stuff
-			icmpPacket.setPayload(iPacket);
-		}
+		//	icmpPacket.setPayload(iPacket);
+		//}
 
-		icmpPacket.serialize();
+		
+		
+		
 
 
 		// Populate IPv4 header
@@ -687,20 +751,69 @@ public class Router
 		// Generation checksum
 
 		ipPacket.serialize();
+		
+		
 
 		// Populate Ethernet header
 		Ethernet etherPacket = new Ethernet();
-
-		etherPacket.setDestinationMACAddress(new byte[6]);
-		etherPacket.setSourceMACAddress(new byte[6]);
 		etherPacket.setEtherType(Ethernet.TYPE_IPv4);
-
 		etherPacket.setPayload(ipPacket);
+		
+		etherPacket.setSourceMACAddress(this.interfaces.get(rtEntry.getInterface()).getMacAddress().toBytes());
+		
+		ArpEntry entry = null;
+		
+		if(rtEntry.getGatewayAddress() == 0) {
+			
+			entry = arpCache.lookup(ipPacket.getDestinationAddress());
+			
+			if(entry != null) {
+		
+				etherPacket.setDestinationMACAddress(entry.getMac().toBytes());
+				
+				
+				
+			} else {
+				
+				// The router does not know the MAC Address of the destination.
+				this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), ipPacket.getDestinationAddress());
+				return;
+				
+			}
+			
+		} else {
+			
+			entry = arpCache.lookup(rtEntry.getGatewayAddress());
+			
+			if(entry != null) {
+			
+				etherPacket.setDestinationMACAddress(entry.getMac().toBytes());
+			} else {
+				
+				this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), rtEntry.getGatewayAddress());
+				// The router does not know the MAC Address of the gateway.
+				return;
+			}
+				
+		}
 
+		//etherPacket.setDestinationMACAddress(new byte[6]);
+		//etherPacket.setSourceMACAddress(new byte[6]);
+		
+		System.out.println("Size of IPv4 packet: " + ipPacket.serialize().length);
+		System.out.println("Size of ICMP packet: " + icmpPacket.serialize().length);
+		System.out.println("Size of ICMP payload: " + icmpPacket.getPayload().serialize().length);
+		
+		
+		
 		// Send ICMP request
 		System.out.println("Sending ICMP message");
+		
+		this.sendPacket(etherPacket, iface);
 
-		this.handlePacket(etherPacket, iface);
+		//this.handlePacket(etherPacket, iface);
+		
+		
 
 	}
 

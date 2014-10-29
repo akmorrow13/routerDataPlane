@@ -241,4 +241,14 @@ public class ArpCache implements Runnable
 		this.router.sendPacket(etherReply, iface);
 		
 	}
+	
+	
+	public void removeRequest(int ip) {
+		
+		ArpRequest request = this.requests.get(ip);
+		
+		if(request != null) {
+			this.requests.remove(ip);
+		}
+	}
 }
