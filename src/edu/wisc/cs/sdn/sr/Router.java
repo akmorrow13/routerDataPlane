@@ -3,7 +3,6 @@ package edu.wisc.cs.sdn.sr;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import edu.wisc.cs.sdn.sr.vns.VNSComm;
 
@@ -243,9 +242,8 @@ public class Router
 			return;
 
 		} else {
-			// Case 3: packet is of other type
-			// TODO: send back error message
-
+			// Case 3: packet is of other type, do nothing
+			
 		}
 
 
@@ -311,7 +309,12 @@ public class Router
 	}
 
 
-
+	/*
+	 * Determines whether IP packets should be handles as destined
+	 * for its own interface or another interface.
+	 * @param etherPacket The incoming packet to be handled
+	 * @param inIface the Interface the Packet was received on 
+	 */
 	private void handleIpPacket(Ethernet etherPacket, Iface inIface) {
 
 		IPv4 ipPacket = (IPv4)etherPacket.getPayload();
@@ -342,6 +345,11 @@ public class Router
 		return;
 	}
 
+	/*
+	 * Handles IP packets that are destined for interfaces not belonging to router.
+	 * @param etherPacket The incoming packet to be handled
+	 * @param inIface the Interface the Packet was received on 
+	 */
 	private void reRouteNonInterface(Ethernet etherPacket, Iface inIface) {
 
 		IPv4 ipPacket = null;
@@ -468,7 +476,12 @@ public class Router
 
 		System.out.println("Packet sent to a new IP.");
 	}
-
+	
+	/*
+	 * Handles IP packets that are destined for the routers own interface.
+	 * @param etherPacket The incoming packet to be handled
+	 * @param inIface the Interface the Packet was received on 
+	 */
 	private void reRouteInterface(Ethernet etherPacket, Iface inIface) {
 
 		IPv4 ipPacket = null;
@@ -646,7 +659,6 @@ public class Router
 
 			icmpPacket.setPayload(newData);
 
-
 		} else if(type == 11) {
 
 			byte[] data = new byte[32];
@@ -729,13 +741,7 @@ public class Router
 
 		}
 
-		System.out.println("Size of IPv4 packet: " + ipPacket.serialize().length);
-		System.out.println("Size of ICMP packet: " + icmpPacket.serialize().length);
-		System.out.println("Size of ICMP payload: " + icmpPacket.getPayload().serialize().length);
-
-
 		// Send ICMP request
-		System.out.println("Sending ICMP message");
 
 		this.sendPacket(etherPacket, iface);
 
