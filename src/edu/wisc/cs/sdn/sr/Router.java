@@ -399,6 +399,25 @@ public class Router
 
 		// find the IP address in the routing table with the longest prefix match by subtraction comparison
 		RouteTableEntry rtEntry = this.routeTable.findBestEntry(ipPacket.getDestinationAddress());
+		
+		if(rtEntry.getCost() > 16)  {
+			// send ICMP message
+			byte[] payloadBytes = new byte[8];
+
+			ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
+
+			bb.get(payloadBytes, 0, 8);
+
+			IPv4 ipClone = (IPv4) ipPacket.clone();
+
+			Data data = new Data();
+			data.setData(payloadBytes);
+
+			ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
+			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 3, ipClone);
+			return;
+			
+		}
 
 		// retrieve the next-hop MAC address corresponding to the IP
 
