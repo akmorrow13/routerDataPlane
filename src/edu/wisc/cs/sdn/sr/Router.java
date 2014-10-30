@@ -400,32 +400,15 @@ public class Router
 		// find the IP address in the routing table with the longest prefix match by subtraction comparison
 		RouteTableEntry rtEntry = this.routeTable.findBestEntry(ipPacket.getDestinationAddress());
 		
-		if(rtEntry.getCost() > 16)  {
-			// send ICMP message
-			byte[] payloadBytes = new byte[8];
-
-			ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
-
-			bb.get(payloadBytes, 0, 8);
-
-			IPv4 ipClone = (IPv4) ipPacket.clone();
-
-			Data data = new Data();
-			data.setData(payloadBytes);
-
-			ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
-			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 3, ipClone);
-			return;
-			
-		}
-
 		// retrieve the next-hop MAC address corresponding to the IP
 
 		ArpEntry entry;
 
 		if(rtEntry != null) {
+			
 
 			if(rtEntry.getGatewayAddress() == 0) {
+				
 
 				entry = arpCache.lookup(ipPacket.getDestinationAddress());
 
@@ -438,26 +421,32 @@ public class Router
 
 
 			} else {
-
+				
+				if(rtEntry.getCost() > 16)  {
+					// send ICMP message
+					byte[] payloadBytes = new byte[8];
+		
+					ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
+		
+					bb.get(payloadBytes, 0, 8);
+		
+					IPv4 ipClone = (IPv4) ipPacket.clone();
+		
+					Data data = new Data();
+					data.setData(payloadBytes);
+		
+					ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
+					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 3, ipClone);
+					return;
+					
+				}
+				
 				entry = arpCache.lookup(rtEntry.getGatewayAddress());
 
 				if (entry == null) { // The router has not the MAC address of nextHop.
 
 					this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), rtEntry.getGatewayAddress());
-					byte[] payloadBytes = new byte[8];
-
-					ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
-
-					bb.get(payloadBytes, 0, 8);
-
-					IPv4 ipClone = (IPv4) ipPacket.clone();
-
-					Data data = new Data();
-					data.setData(payloadBytes);
-
-					ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
-					System.out.println("in route table, next hop not in cache");
-					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, ipClone);
+					
 					return;
 
 				}
@@ -465,7 +454,6 @@ public class Router
 			}
 
 		} else {
-			System.out.println("There is no way to reach host.");
 
 			byte[] payloadBytes = new byte[8];
 
@@ -543,7 +531,7 @@ public class Router
 
 			// If it is UDP and port 520, repass the request to RIP.
 			if(udpPacket.getDestinationPort() == 520) {
-				System.out.println("Received a 520 UDP");
+				
 				rip.handlePacket(etherPacket, inIface);
 			} else {
 
@@ -564,8 +552,6 @@ public class Router
 
 		} else if (ipPacket.getProtocol() == IPv4.PROTOCOL_TCP) {
 
-			System.out.println("Received a TCP.");
-
 			byte[] payloadBytes = new byte[8];
 
 			ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
@@ -582,7 +568,6 @@ public class Router
 
 		} else {
 			// Ignore the packet.
-			System.out.println("Packet ignored.");
 			return;
 		} 
 
