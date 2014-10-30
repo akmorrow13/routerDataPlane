@@ -94,11 +94,7 @@ public class ArpCache implements Runnable
 		
 		if (request.getSentCount() >= MAX_SEND_COUNT)
 		{
-			/*********************************************************/
-		    /* TODO: send ICMP host unreachable to the source        */ 
-		    /* address of all packets waiting on this request        */
 			
-		    /*********************************************************/
 			
 			System.out.println("Host unreachable.");
 			
