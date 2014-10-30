@@ -33,7 +33,6 @@ public class ArpRequest
 	 */
 	
 	private Ethernet etherPacketOriginalHost;
-	private Iface ifaceOriginalHost;
 	
 	public ArpRequest(int ip, Iface iface)
 	{
@@ -102,11 +101,4 @@ public class ArpRequest
 		return etherPacketOriginalHost;
 	}
 
-	public void setIfaceOriginalHost(Iface ifaceOriginalHost) {
-		this.ifaceOriginalHost = ifaceOriginalHost;
-	}
-
-	public Iface getIfaceOriginalHost() {
-		return ifaceOriginalHost;
-	}
 }

@@ -511,7 +511,7 @@ public class Router
 
 			ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
 			
-			sendICMPMessage(inIface.getIpAddress(), ipPacket.getSourceAddress(), (byte) 7, (byte) 3, ipClone);
+			sendICMPMessage(inIface.getIpAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 3, ipClone);
 
 			return;
 		}

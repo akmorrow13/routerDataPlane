@@ -106,33 +106,38 @@ public class ArpCache implements Runnable
 			IPv4 ipPacket = null;
 			
 			if(etherPacket.getEtherType() == Ethernet.TYPE_IPv4) { // An Ethernet frame has the Type field.
+				
 				ipPacket = (IPv4)etherPacket.getPayload();
-			}
-			
-			byte[] payloadBytes = new byte[8];
-			
-			ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
-			
-			bb.get(payloadBytes, 0, 8);
-			
-			IPv4 ipClone = (IPv4) ipPacket.clone();
-			
-			Data data = new Data();
-			data.setData(payloadBytes);
-			
-			ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
-			
-			this.router.sendICMPMessage(ipPacket.getSourceAddress(), request.getIface().getIpAddress(), (byte) 0, (byte) 3, ipClone);
-			
-			int requestAddress = request.getIpAddress();
+				
+				byte[] payloadBytes = new byte[8];
+				
+				ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
+				
+				bb.get(payloadBytes, 0, 8);
+				
+				IPv4 ipClone = (IPv4) ipPacket.clone();
+				
+				Data data = new Data();
+				data.setData(payloadBytes);
+				
+				ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
+				
+				this.router.sendICMPMessage(request.getIface().getIpAddress(),ipPacket.getSourceAddress(), (byte) 1, (byte) 3, ipClone);
+				
+				int requestAddress = request.getIpAddress();
 
-			for(Integer waitingRequestIP : this.requests.keySet()){
-				if(this.requests.get(waitingRequestIP).getIpAddress() == requestAddress){
-					// send ICMP host unreachable to source
-					this.requests.remove(requestAddress);
+				for(Integer waitingRequestIP : this.requests.keySet()){
+					if(this.requests.get(waitingRequestIP).getIpAddress() == requestAddress){
+						// send ICMP host unreachable to source
+						this.requests.remove(requestAddress);
 
+					}
 				}
-			}
+				
+			} 
+			
+			
+			
 			
 		}
 		else
