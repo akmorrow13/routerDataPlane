@@ -1,11 +1,14 @@
 
 package edu.wisc.cs.sdn.sr;
 
+import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import net.floodlightcontroller.packet.ARP;
+import net.floodlightcontroller.packet.Data;
 import net.floodlightcontroller.packet.Ethernet;
+import net.floodlightcontroller.packet.IPv4;
 import net.floodlightcontroller.util.MACAddress;
 
 /**
@@ -38,6 +41,8 @@ public class ArpCache implements Runnable
 	 * Initializes an empty ARP cache for a router.
 	 * @param router router to which this cache belongs
 	 */
+
+	
 	public ArpCache(Router router)
 	{
 		this.router = router;
@@ -95,8 +100,29 @@ public class ArpCache implements Runnable
 			
 		    /*********************************************************/
 			
-			
 			System.out.println("Host unreachable.");
+			
+			Ethernet etherPacket = request.getEtherPacketOriginalHost();
+			IPv4 ipPacket = null;
+			
+			if(etherPacket.getEtherType() == Ethernet.TYPE_IPv4) { // An Ethernet frame has the Type field.
+				ipPacket = (IPv4)etherPacket.getPayload();
+			}
+			
+			byte[] payloadBytes = new byte[8];
+			
+			ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
+			
+			bb.get(payloadBytes, 0, 8);
+			
+			IPv4 ipClone = (IPv4) ipPacket.clone();
+			
+			Data data = new Data();
+			data.setData(payloadBytes);
+			
+			ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
+			
+			this.router.sendICMPMessage(ipPacket.getSourceAddress(), request.getIface().getIpAddress(), (byte) 0, (byte) 3, ipClone);
 			
 			int requestAddress = request.getIpAddress();
 
@@ -155,6 +181,8 @@ public class ArpCache implements Runnable
 		if (null == request)
 		{
 			request = new ArpRequest(nextHopIp, outIface);
+			request.setEtherPacketOriginalHost(etherPacket);
+			
 			this.requests.put(nextHopIp, request);
 		}
 		request.enqueuePacket(etherPacket);

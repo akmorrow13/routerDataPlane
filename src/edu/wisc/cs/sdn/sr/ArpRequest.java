@@ -31,6 +31,10 @@ public class ArpRequest
 	 * @param ip IP address whose corresponding MAC address is being requested
 	 * @param iface interface over which the resolution should occur
 	 */
+	
+	private Ethernet etherPacketOriginalHost;
+	private Iface ifaceOriginalHost;
+	
 	public ArpRequest(int ip, Iface iface)
 	{
 		this.ipAddress = ip;
@@ -89,4 +93,20 @@ public class ArpRequest
 	 */
 	public void enqueuePacket(Ethernet etherPacket)
 	{ this.waitingPackets.add(etherPacket); }
+
+	public void setEtherPacketOriginalHost(Ethernet etherPacketOriginalHost) {
+		this.etherPacketOriginalHost = etherPacketOriginalHost;
+	}
+
+	public Ethernet getEtherPacketOriginalHost() {
+		return etherPacketOriginalHost;
+	}
+
+	public void setIfaceOriginalHost(Iface ifaceOriginalHost) {
+		this.ifaceOriginalHost = ifaceOriginalHost;
+	}
+
+	public Iface getIfaceOriginalHost() {
+		return ifaceOriginalHost;
+	}
 }
