@@ -98,19 +98,19 @@ public class ArpCache implements Runnable
 			
 			System.out.println("Host unreachable.");
 			
-			Ethernet etherPacket = request.getEtherPacketOriginalHost();
+			// If the router does not receive a ARP reply (i.e. there is no host with that IP address),
+			// it should send to the original host an ICMP message informing the error.
+			
+			Ethernet etherPacket = request.getEtherPacketOriginalHost(); // Get the original Ethernet packet from the original host.
+			
 			IPv4 ipPacket = null;
 			
 			if(etherPacket.getEtherType() == Ethernet.TYPE_IPv4) { // An Ethernet frame has the Type field.
 				
 				ipPacket = (IPv4)etherPacket.getPayload();
-				
 				byte[] payloadBytes = new byte[8];
-				
 				ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
-				
 				bb.get(payloadBytes, 0, 8);
-				
 				IPv4 ipClone = (IPv4) ipPacket.clone();
 				
 				Data data = new Data();
@@ -131,10 +131,7 @@ public class ArpCache implements Runnable
 				}
 				
 			} 
-			
-			
-			
-			
+	
 		}
 		else
 		{
@@ -271,7 +268,10 @@ public class ArpCache implements Runnable
 		
 	}
 	
-	
+	/**
+	 * Remove an ARP reply from the requests which have the IP as destination.
+	 * @param ip The IP to find the ARP request and remove it.
+	 */
 	public void removeRequest(int ip) {
 		
 		ArpRequest request = this.requests.get(ip);

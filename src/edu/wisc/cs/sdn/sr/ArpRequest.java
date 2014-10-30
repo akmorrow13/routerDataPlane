@@ -32,6 +32,9 @@ public class ArpRequest
 	 * @param iface interface over which the resolution should occur
 	 */
 	
+	/**
+	 * Stores the Ethernet packet from the host who wants to communicate with the final destination.
+	 * */
 	private Ethernet etherPacketOriginalHost;
 	
 	public ArpRequest(int ip, Iface iface)
@@ -92,11 +95,18 @@ public class ArpRequest
 	 */
 	public void enqueuePacket(Ethernet etherPacket)
 	{ this.waitingPackets.add(etherPacket); }
-
+	
+	
+	/**
+	 * @param etherPacketOriginalHost The Ethernet packet from the host who wants to communicate with the final destination.
+	 */
 	public void setEtherPacketOriginalHost(Ethernet etherPacketOriginalHost) {
 		this.etherPacketOriginalHost = etherPacketOriginalHost;
 	}
-
+	
+	/**
+	 * @return etherPacketOriginalHost The Ethernet packet from the host who wants to communicate with the final destination.
+	 */
 	public Ethernet getEtherPacketOriginalHost() {
 		return etherPacketOriginalHost;
 	}
