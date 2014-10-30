@@ -293,47 +293,12 @@ public class Router
 
 			// Update ARP cache with contents of ARP reply
 
-			ArpRequest request = this.arpCache.insert(
+			this.arpCache.insert(
 					new MACAddress(arpPacket.getSenderHardwareAddress()),
 					sourceIp);
 			
 			this.arpCache.removeRequest(sourceIp);		
 			
-			/*
-			// Process pending ARP request entry, if there is one
-			if (request != null)
-			{
-
-				IPv4 waitingIpPacket = null;
-				ARP waitingArpPacket = null;
-				int waitingTargettIp = 0;
-
-				for (Ethernet packet : request.getWaitingPackets()) {
-
-					if(packet.getEtherType() == Ethernet.TYPE_ARP){
-
-						waitingIpPacket = (IPv4)packet.getPayload();
-
-						waitingArpPacket = (ARP)waitingIpPacket.getPayload();
-
-						waitingTargettIp = ByteBuffer.wrap(
-								waitingArpPacket.getTargetProtocolAddress()).getInt();
-
-						/* In this moment, the Router received the reply after sending a ARP request via broadcast.
-						 * Then, the ArpCache was filled with the pair MAC-IP and that request has to be removed from the waiting list.
-						 
-
-						if(sourceIp == waitingTargettIp){ // Check if that ARP request left from my interface.
-							request.getWaitingPackets().remove(packet); // Remove the packet from the waiting list.
-							System.out.println("------------------Removed-----------------");
-						}
-
-					}
-
-
-				}
-			}
-			*/
 			break;
 		}
 	}
@@ -581,19 +546,18 @@ public class Router
 				bb.get(payloadBytes, 0, 8);
 				
 				IPv4 ipClone = (IPv4) ipPacket.clone();
+				Data tempData = new Data();
+				tempData.deserialize(payloadBytes, 0, 8);
 				
-				Data data = new Data();
-				data.setData(payloadBytes);
-				
-				//tempIcmpPacket.deserialize(payloadBytes, 0, 8);
-
-				ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
+				ipClone.setPayload(tempData);
 				
 				sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 3, (byte) 3, ipClone); // Port unreachable
 			}
 
 		} else if (ipPacket.getProtocol() == IPv4.PROTOCOL_TCP) {
+			
 			System.out.println("Received a TCP.");
+			
 			byte[] payloadBytes = new byte[8];
 			
 			ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
@@ -601,11 +565,10 @@ public class Router
 			bb.get(payloadBytes, 0, 8);
 			
 			IPv4 ipClone = (IPv4) ipPacket.clone();
-			ICMP tempIcmpPacket = new ICMP();
-			tempIcmpPacket.deserialize(payloadBytes, 0, 8);
+			Data tempData = new Data();
+			tempData.deserialize(payloadBytes, 0, 8);
 			
-			ipClone.setPayload(tempIcmpPacket);
-			
+			ipClone.setPayload(tempData);
 			
 			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 3, (byte) 3, ipClone); // Port unreachable
 

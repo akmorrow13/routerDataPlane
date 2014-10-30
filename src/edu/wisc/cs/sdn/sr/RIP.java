@@ -279,7 +279,7 @@ public class RIP implements Runnable
 		etherPacket.setEtherType(Ethernet.TYPE_IPv4);
 		etherPacket.setPayload(ipPacket);
 		
-		// TODO The split horizon is implemented below, but I couldn't test it yet.
+		// The split horizon is implemented below, but I couldn't test it yet.
 		
 		RIPv2 ripPacketCopy = (RIPv2) ripPacket.clone();
 		
