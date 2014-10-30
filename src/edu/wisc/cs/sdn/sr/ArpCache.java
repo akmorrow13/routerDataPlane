@@ -153,7 +153,23 @@ public class ArpCache implements Runnable
 	 */
 	public ArpRequest insert(MACAddress mac, int ip)
 	{
+		
 		ArpRequest request = this.requests.remove(ip);
+		
+		// Flush the waitingPackets.
+		
+		if(request != null) {
+			
+			for (Ethernet etherPacket : request.getWaitingPackets()) {
+				etherPacket.setDestinationMACAddress(mac.toBytes());
+				etherPacket.setSourceMACAddress(request.getIface().getMacAddress().toBytes());
+				
+				this.router.sendPacket(etherPacket, request.getIface());
+				
+			}
+			
+		} 		
+		
 		this.entries.put(ip, new ArpEntry(mac, ip));
 		return request;
 	}
@@ -268,16 +284,4 @@ public class ArpCache implements Runnable
 		
 	}
 	
-	/**
-	 * Remove an ARP reply from the requests which have the IP as destination.
-	 * @param ip The IP to find the ARP request and remove it.
-	 */
-	public void removeRequest(int ip) {
-		
-		ArpRequest request = this.requests.get(ip);
-		
-		if(request != null) {
-			this.requests.remove(ip);
-		}
-	}
 }

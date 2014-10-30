@@ -3,6 +3,7 @@ package edu.wisc.cs.sdn.sr;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import edu.wisc.cs.sdn.sr.vns.VNSComm;
 
@@ -225,6 +226,11 @@ public class Router
 		if (etherPacket.getEtherType() == Ethernet.TYPE_ARP) {	
 
 			System.out.println("Received a ARP packet.");
+			
+			
+			System.out.println(etherPacket);
+			
+			
 			handleArpPacket(etherPacket, inIface);	
 
 			// Case 2: packet is of type IP 
@@ -255,9 +261,11 @@ public class Router
 		// Make sure it's an ARP packet
 		if (etherPacket.getEtherType() != Ethernet.TYPE_ARP)
 		{ return; }
+		
 
 		// Get ARP header
 		ARP arpPacket = (ARP)etherPacket.getPayload();
+		
 		int targetIp = ByteBuffer.wrap(
 				arpPacket.getTargetProtocolAddress()).getInt();
 
@@ -288,6 +296,7 @@ public class Router
 
 			// Check if reply is for one of my interfaces
 			if (targetIp != inIface.getIpAddress()){ 
+				System.out.println("TargetIP is different! " + Util.intToDottedDecimal(targetIp));
 				break; 
 			}
 
@@ -296,9 +305,7 @@ public class Router
 			this.arpCache.insert(
 					new MACAddress(arpPacket.getSenderHardwareAddress()),
 					sourceIp);
-			
-			this.arpCache.removeRequest(sourceIp);		
-			
+
 			break;
 		}
 	}
@@ -353,26 +360,26 @@ public class Router
 		byte ttl = ipPacket.getTtl();
 		ttl -= 1;
 		ipPacket.setTtl(ttl);
-		
+
 		if(ttl <= 0) {
 
 			// If the TTL is 0, so the packet should be dropped.
 			// send time exceeded ICMP message
 			System.out.println("TTL expired");
-			
+
 			byte[] payloadBytes = new byte[8];
-			
+
 			ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
-			
+
 			bb.get(payloadBytes, 0, 8);
-			
+
 			IPv4 ipClone = (IPv4) ipPacket.clone();
-			
+
 			Data data = new Data();
 			data.setData(payloadBytes);
 
 			ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
-			
+
 			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 11, ipClone);
 			return;
 
@@ -399,20 +406,6 @@ public class Router
 
 					this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), ipPacket.getDestinationAddress());
 					
-					byte[] payloadBytes = new byte[8];
-					
-					ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
-					
-					bb.get(payloadBytes, 0, 8);
-					
-					IPv4 ipClone = (IPv4) ipPacket.clone();
-					
-					Data data = new Data();
-					data.setData(payloadBytes);
-
-					ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
-					System.out.println("in route table, not in cache");
-					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, ipClone);
 					return;
 				}	
 
@@ -425,13 +418,13 @@ public class Router
 
 					this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), rtEntry.getGatewayAddress());
 					byte[] payloadBytes = new byte[8];
-					
+
 					ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
-					
+
 					bb.get(payloadBytes, 0, 8);
-					
+
 					IPv4 ipClone = (IPv4) ipPacket.clone();
-					
+
 					Data data = new Data();
 					data.setData(payloadBytes);
 
@@ -446,20 +439,20 @@ public class Router
 
 		} else {
 			System.out.println("There is no way to reach host.");
-			
+
 			byte[] payloadBytes = new byte[8];
-			
+
 			ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
-			
+
 			bb.get(payloadBytes, 0, 8);
-			
+
 			IPv4 ipClone = (IPv4) ipPacket.clone();
-			
+
 			Data data = new Data();
 			data.setData(payloadBytes);
 
 			ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
-			
+
 			sendICMPMessage(inIface.getIpAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 3, ipClone);
 
 			return;
@@ -496,9 +489,9 @@ public class Router
 				if (icmpPacket.getIcmpType() == ICMP.TYPE_ECHO_REQUEST) {	
 
 					System.out.println("Received a echo request.");
-					
+
 					// Send a echo reply to the source address.
-					
+
 					sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 0, icmpPacket.getPayload()); 
 
 					return;
@@ -521,38 +514,38 @@ public class Router
 				System.out.println("Received a 520 UDP");
 				rip.handlePacket(etherPacket, inIface);
 			} else {
-				
+
 				byte[] payloadBytes = new byte[8];
-				
+
 				ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
-				
+
 				bb.get(payloadBytes, 0, 8);
-				
+
 				IPv4 ipClone = (IPv4) ipPacket.clone();
 				Data tempData = new Data();
 				tempData.deserialize(payloadBytes, 0, 8);
-				
+
 				ipClone.setPayload(tempData);
-				
+
 				sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 3, (byte) 3, ipClone); // Port unreachable
 			}
 
 		} else if (ipPacket.getProtocol() == IPv4.PROTOCOL_TCP) {
-			
+
 			System.out.println("Received a TCP.");
-			
+
 			byte[] payloadBytes = new byte[8];
-			
+
 			ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
-			
+
 			bb.get(payloadBytes, 0, 8);
-			
+
 			IPv4 ipClone = (IPv4) ipPacket.clone();
 			Data tempData = new Data();
 			tempData.deserialize(payloadBytes, 0, 8);
-			
+
 			ipClone.setPayload(tempData);
-			
+
 			sendICMPMessage(ipPacket.getDestinationAddress(), ipPacket.getSourceAddress(), (byte) 3, (byte) 3, ipClone); // Port unreachable
 
 		} else {
@@ -637,43 +630,43 @@ public class Router
 		icmpPacket.setIcmpCode(code);
 		icmpPacket.setIcmpType(type);
 		icmpPacket.setChecksum((short) 0);
-				
+
 		if(type == 3) {
-			
-			byte[] data = new byte[32];
-			
-			ByteBuffer bb = ByteBuffer.wrap(data);			
-			
-			bb.putShort((short) 0);
-			bb.putShort((short) 1500);
-			bb.put(iPacket.serialize());
-			
-			Data newData = new Data();
-			newData.setData(data);
-			
-			icmpPacket.setPayload(newData);
-						
-			
-		} else if(type == 11) {
-			
+
 			byte[] data = new byte[32];
 
 			ByteBuffer bb = ByteBuffer.wrap(data);			
-			
+
+			bb.putShort((short) 0);
+			bb.putShort((short) 1500);
+			bb.put(iPacket.serialize());
+
+			Data newData = new Data();
+			newData.setData(data);
+
+			icmpPacket.setPayload(newData);
+
+
+		} else if(type == 11) {
+
+			byte[] data = new byte[32];
+
+			ByteBuffer bb = ByteBuffer.wrap(data);			
+
 			bb.putShort((short) 0);
 			bb.putShort((short) 0);
 			bb.put(iPacket.serialize());
-			
+
 			Data newData = new Data();
 			newData.setData(data);
-			
+
 			icmpPacket.setPayload(newData);
-			
+
 		} else if(type == 0) {
 			if(iPacket != null){
-				
-					icmpPacket.setPayload(iPacket);
-				}
+
+				icmpPacket.setPayload(iPacket);
+			}
 		}
 
 		// Populate IPv4 header
@@ -698,54 +691,54 @@ public class Router
 		Ethernet etherPacket = new Ethernet();
 		etherPacket.setEtherType(Ethernet.TYPE_IPv4);
 		etherPacket.setPayload(ipPacket);
-		
+
 		etherPacket.setSourceMACAddress(this.interfaces.get(rtEntry.getInterface()).getMacAddress().toBytes());
-		
+
 		ArpEntry entry = null;
-		
+
 		if(rtEntry.getGatewayAddress() == 0) {
-			
+
 			entry = arpCache.lookup(ipPacket.getDestinationAddress());
-			
+
 			if(entry != null) {
-		
+
 				etherPacket.setDestinationMACAddress(entry.getMac().toBytes());
-				
-				
+
+
 			} else {
-				
+
 				// The router does not know the MAC Address of the destination.
 				this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), ipPacket.getDestinationAddress());
 				return;
-				
+
 			}
-			
+
 		} else {
-			
+
 			entry = arpCache.lookup(rtEntry.getGatewayAddress());
-			
+
 			if(entry != null) {
-			
+
 				etherPacket.setDestinationMACAddress(entry.getMac().toBytes());
 			} else {
-				
+
 				this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), rtEntry.getGatewayAddress());
 				// The router does not know the MAC Address of the gateway.
 				return;
 			}
-				
+
 		}
-		
+
 		System.out.println("Size of IPv4 packet: " + ipPacket.serialize().length);
 		System.out.println("Size of ICMP packet: " + icmpPacket.serialize().length);
 		System.out.println("Size of ICMP payload: " + icmpPacket.getPayload().serialize().length);
-		
-		
+
+
 		// Send ICMP request
 		System.out.println("Sending ICMP message");
-		
+
 		this.sendPacket(etherPacket, iface);
-		
+
 	}
 
 
