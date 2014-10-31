@@ -408,8 +408,9 @@ public class Router
 					this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), ipPacket.getDestinationAddress());
 					
 					return;
-				}	
-
+					
+				} 		
+				
 
 			} else {
 
@@ -418,6 +419,8 @@ public class Router
 				if (entry == null) { // The router has not the MAC address of nextHop.
 
 					this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), rtEntry.getGatewayAddress());
+					
+					
 					byte[] payloadBytes = new byte[8];
 
 					ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
@@ -431,7 +434,9 @@ public class Router
 
 					ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
 					System.out.println("in route table, next hop not in cache");
+					
 					sendICMPMessage(inIface.getIpAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, ipClone);
+					
 					return;
 
 				}

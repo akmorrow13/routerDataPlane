@@ -69,6 +69,7 @@ public class RIP implements Runnable
 
 		// Send RIP request in broadcast.
 		sendRIPMessageMulticast(RIPv2.COMMAND_REQUEST);
+		sendRIPMessageMulticast(RIPv2.COMMAND_RESPONSE);
 		
 	}
 
