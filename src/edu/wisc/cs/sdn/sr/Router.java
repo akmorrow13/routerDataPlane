@@ -261,7 +261,6 @@ public class Router
 		if (etherPacket.getEtherType() != Ethernet.TYPE_ARP)
 		{ return; }
 
-
 		// Get ARP header
 		ARP arpPacket = (ARP)etherPacket.getPayload();
 
@@ -276,6 +275,9 @@ public class Router
 		{
 		case ARP.OP_REQUEST:
 			// Check if request is for one of my interfaces
+			
+			System.out.println("Received a ARP request.");
+			
 			if (targetIp == inIface.getIpAddress())
 			{ 
 				// If the destination of the ARP reply is this router, add the information about the sender in the ArpCache.
@@ -316,11 +318,6 @@ public class Router
 		IPv4 ipPacket = (IPv4)etherPacket.getPayload();
 		int destinationIP = ipPacket.getDestinationAddress();
 
-
-
-
-		// Case 1: destined for interface
-
 		boolean sentToInterface = false;
 
 		for(Iface ifaceRouter : interfaces.values()){
@@ -336,7 +333,7 @@ public class Router
 		// Case 2: destined to another IP.
 
 		if(!sentToInterface){
-			System.out.println("Packet addressed to other IP.");
+			System.out.println("Packet addressed to another IP.");
 			reRouteNonInterface(etherPacket, inIface);
 			return;
 		}
@@ -353,8 +350,9 @@ public class Router
 		}
 
 		if (!verifyCheckSumIP(ipPacket)) {
+			
 			// corrupt packet. Error
-			System.out.println("Correupted packet.");
+			System.out.println("Wrong IP checksum.");
 
 			// corrupt packet. Error
 
@@ -374,13 +372,11 @@ public class Router
 			sendICMPMessage(inIface.getIpAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 12, ipClone);
 
 
-
 			return;
 		}
 
-		// decrement TTL
+		// Decrement TTL.
 		byte ttl = ipPacket.getTtl();
-
 
 		ttl -= 1;
 		ipPacket.setTtl(ttl);
@@ -388,7 +384,8 @@ public class Router
 		if(ttl <= 0) {
 
 			// If the TTL is 0, so the packet should be dropped.
-			// send time exceeded ICMP message
+			// send time exceeded ICMP message.
+			
 			System.out.println("TTL expired");
 
 			byte[] payloadBytes = new byte[8];
@@ -409,20 +406,24 @@ public class Router
 
 		}
 
+		// Generating a new checksum.
+		
 		ipPacket.setChecksum((byte) 0);
 		ipPacket.serialize();
 
 
-		// find the IP address in the routing table with the longest prefix match by subtraction comparison
+		// Find the IP address in the routing table with the longest prefix match by subtraction comparison.
+		
 		RouteTableEntry rtEntry = this.routeTable.findBestEntry(ipPacket.getDestinationAddress());
 
 		// retrieve the next-hop MAC address corresponding to the IP
 
 		ArpEntry entry;
 
-		if(rtEntry != null) {
+		
+		if(rtEntry != null) { // If one route was found in the route table.
 
-			if(rtEntry.getGatewayAddress() == 0) {
+			if(rtEntry.getGatewayAddress() == 0) { // The gateway is equal to zero when the destination IP is directly linked to the router.
 
 				entry = arpCache.lookup(ipPacket.getDestinationAddress());
 
@@ -435,11 +436,11 @@ public class Router
 				} 		
 
 
-			} else {
+			} else { // The gateway is different of zero when the packet needs to be forwarded to another router.
 
 				entry = arpCache.lookup(rtEntry.getGatewayAddress());
 
-				if (entry == null) { // The router has not the MAC address of nextHop.
+				if (entry == null) { // The router has not the MAC address of next hop (gateway).
 
 					this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), rtEntry.getGatewayAddress());
 
@@ -449,28 +450,30 @@ public class Router
 
 			}
 
-		} else {
+		} else { // The router has no route to that destination IP.
 
 			System.out.println("There is no way to reach host.");
+			
+			// Generating the basic structure of the ICMP message.
 
 			byte[] payloadBytes = new byte[8];
-
 			ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
-
 			bb.get(payloadBytes, 0, 8);
-
 			IPv4 ipClone = (IPv4) ipPacket.clone();
-
 			Data data = new Data();
 			data.setData(payloadBytes);
-
 			ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
+			
+			// Send the ICMP message informing that that IP/ network is unreachable.
 
 			sendICMPMessage(inIface.getIpAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 3, ipClone);
 
 			return;
 		}
 
+		
+		// In this moment, the router does not identify any problem.
+		
 		Iface ifaceOut =  this.interfaces.get(rtEntry.getInterface());
 
 		etherPacket.setPayload(ipPacket);
@@ -655,7 +658,7 @@ public class Router
 
 		Iface iface = this.interfaces.get(rtEntry.getInterface()); // Get the interface to reach this IP.
 
-		// Populate ICMP header
+		// Populate ICMP header and its payload.
 
 		ICMP icmpPacket = new ICMP();
 
@@ -760,11 +763,6 @@ public class Router
 			}
 
 		}
-
-		System.out.println("Size of IPv4 packet: " + ipPacket.serialize().length);
-		System.out.println("Size of ICMP packet: " + icmpPacket.serialize().length);
-		System.out.println("Size of ICMP payload: " + icmpPacket.getPayload().serialize().length);
-
 
 		// Send ICMP request
 		System.out.println("Sending ICMP message");
