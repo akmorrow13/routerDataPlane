@@ -41,8 +41,6 @@ public class ArpCache implements Runnable
 	 * Initializes an empty ARP cache for a router.
 	 * @param router router to which this cache belongs
 	 */
-
-
 	public ArpCache(Router router)
 	{
 		this.router = router;
@@ -95,17 +93,17 @@ public class ArpCache implements Runnable
 		if (request.getSentCount() >= MAX_SEND_COUNT)
 		{
 
-
 			System.out.println("Host unreachable.");
 
 			// If the router does not receive a ARP reply (i.e. there is no host with that IP address),
 			// it should send to the original host an ICMP message informing the error.
-
 			for(Ethernet etherPacket : request.getWaitingPackets()) {
 
 				IPv4 ipPacket = null;
 
-				if(etherPacket.getEtherType() == Ethernet.TYPE_IPv4) { // An Ethernet frame has the Type field.
+				// If the Packet is IP, send ICMP message to waiting source and remove
+				// the request from the queue
+				if(etherPacket.getEtherType() == Ethernet.TYPE_IPv4) { 
 
 					ipPacket = (IPv4)etherPacket.getPayload();
 					byte[] payloadBytes = new byte[8];
@@ -120,7 +118,6 @@ public class ArpCache implements Runnable
 
 					this.router.sendICMPMessage(request.getIface().getIpAddress(),ipPacket.getSourceAddress(), (byte) 1, (byte) 3, ipClone);
 					
-					
 					this.requests.remove(request.getIpAddress());
 					
 				}
@@ -129,9 +126,12 @@ public class ArpCache implements Runnable
 		}
 		else
 		{
+			// if not timed out, keep attempting to send Arp requests if
+			// the IP request has not yet been cached
 			ArpEntry entry = this.lookup(request.getIpAddress());
 			// Send ARP request packet
 			if(entry == null){
+				
 				this.sendArpRequest(request);
 				request.incrementSent();
 			}
@@ -150,21 +150,23 @@ public class ArpCache implements Runnable
 
 		ArpRequest request = this.requests.remove(ip);
 
-		// Flush the waitingPackets.
-
+		// After an IP has successfully been inserted into the
+		// cache, resend all packets waiting on this request
 		if(request != null) {
 
 			for (Ethernet etherPacket : request.getWaitingPackets()) {
+				
 				etherPacket.setDestinationMACAddress(mac.toBytes());
+				
 				etherPacket.setSourceMACAddress(request.getIface().getMacAddress().toBytes());
 
 				this.router.sendPacket(etherPacket, request.getIface());
 
 			}
-
 		} 		
 
 		this.entries.put(ip, new ArpEntry(mac, ip));
+		
 		return request;
 	}
 
@@ -193,6 +195,7 @@ public class ArpCache implements Runnable
 			this.requests.put(nextHopIp, request);
 		}
 		request.enqueuePacket(etherPacket);
+		
 		this.updateArpRequest(request);
 	}
 
@@ -225,15 +228,11 @@ public class ArpCache implements Runnable
 		arpPkt.setSenderHardwareAddress(
 				request.getIface().getMacAddress().toBytes());
 		arpPkt.setSenderProtocolAddress(request.getIface().getIpAddress());
-
-		arpPkt.setTargetHardwareAddress(broadcastMac); // ******* ADDED BY DENIS!!!
-
+		arpPkt.setTargetHardwareAddress(broadcastMac); 
 		arpPkt.setTargetProtocolAddress(request.getIpAddress());
 
-		// Stack headers
+		// Set the final ethernet payload to the arp Packet
 		etherPkt.setPayload(arpPkt);
-
-
 
 		// Send ARP request
 		System.out.println("Send ARP request");
@@ -267,7 +266,7 @@ public class ArpCache implements Runnable
 		arpReply.setTargetHardwareAddress(arpPacket.getSenderHardwareAddress());
 		arpReply.setTargetProtocolAddress(arpPacket.getSenderProtocolAddress());
 
-		// Stack headers
+		// Set the final ethernet payload to the arp Packet
 		etherReply.setPayload(arpReply);
 
 		// Send ARP request
