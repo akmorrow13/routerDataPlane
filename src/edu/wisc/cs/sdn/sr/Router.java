@@ -225,11 +225,11 @@ public class Router
 		if (etherPacket.getEtherType() == Ethernet.TYPE_ARP) {	
 
 			System.out.println("Received a ARP packet.");
-			
-			
+
+
 			System.out.println(etherPacket);
-			
-			
+
+
 			handleArpPacket(etherPacket, inIface);	
 
 			// Case 2: packet is of type IP 
@@ -242,8 +242,8 @@ public class Router
 			return;
 
 		} else {
-			// Case 3: packet is of other type
-			// TODO: send back error message
+			// Other kind of packets should be ignored.
+			return;
 
 		}
 
@@ -260,11 +260,11 @@ public class Router
 		// Make sure it's an ARP packet
 		if (etherPacket.getEtherType() != Ethernet.TYPE_ARP)
 		{ return; }
-		
+
 
 		// Get ARP header
 		ARP arpPacket = (ARP)etherPacket.getPayload();
-		
+
 		int targetIp = ByteBuffer.wrap(
 				arpPacket.getTargetProtocolAddress()).getInt();
 
@@ -316,6 +316,9 @@ public class Router
 		IPv4 ipPacket = (IPv4)etherPacket.getPayload();
 		int destinationIP = ipPacket.getDestinationAddress();
 
+
+
+
 		// Case 1: destined for interface
 
 		boolean sentToInterface = false;
@@ -352,13 +355,33 @@ public class Router
 		if (!verifyCheckSumIP(ipPacket)) {
 			// corrupt packet. Error
 			System.out.println("Correupted packet.");
+
+			// corrupt packet. Error
+
+			byte[] payloadBytes = new byte[8];
+
+			ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
+
+			bb.get(payloadBytes, 0, 8);
+
+			IPv4 ipClone = (IPv4) ipPacket.clone();
+
+			Data data = new Data();
+			data.setData(payloadBytes);
+
+			ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
+
+			sendICMPMessage(inIface.getIpAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 12, ipClone);
+
+
+
 			return;
 		}
 
 		// decrement TTL
 		byte ttl = ipPacket.getTtl();
-	
-		
+
+
 		ttl -= 1;
 		ipPacket.setTtl(ttl);
 
@@ -406,11 +429,11 @@ public class Router
 				if(entry == null) { // The router does not know the destination MAC.
 
 					this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), ipPacket.getDestinationAddress());
-					
+
 					return;
-					
+
 				} 		
-				
+
 
 			} else {
 
@@ -419,24 +442,7 @@ public class Router
 				if (entry == null) { // The router has not the MAC address of nextHop.
 
 					this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), rtEntry.getGatewayAddress());
-					
-					
-					byte[] payloadBytes = new byte[8];
 
-					ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
-
-					bb.get(payloadBytes, 0, 8);
-
-					IPv4 ipClone = (IPv4) ipPacket.clone();
-
-					Data data = new Data();
-					data.setData(payloadBytes);
-
-					ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
-					System.out.println("in route table, next hop not in cache");
-					
-					sendICMPMessage(inIface.getIpAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, ipClone);
-					
 					return;
 
 				}
@@ -444,7 +450,7 @@ public class Router
 			}
 
 		} else {
-			
+
 			System.out.println("There is no way to reach host.");
 
 			byte[] payloadBytes = new byte[8];
@@ -508,6 +514,25 @@ public class Router
 				}
 			} else {
 				System.out.println("It is ICMP, but its checksum is invalid.");
+
+
+				byte[] payloadBytes = new byte[8];
+
+				ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
+
+				bb.get(payloadBytes, 0, 8);
+
+				IPv4 ipClone = (IPv4) ipPacket.clone();
+
+				Data data = new Data();
+				data.setData(payloadBytes);
+
+				ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
+
+				sendICMPMessage(inIface.getIpAddress(), ipPacket.getSourceAddress(), (byte) 0, (byte) 12, ipClone);
+
+
+
 			}
 		}
 
@@ -654,7 +679,7 @@ public class Router
 			icmpPacket.setPayload(newData);
 
 
-		} else if(type == 11) {
+		} else if(type == 11 || type == 12) {
 
 			byte[] data = new byte[32];
 
