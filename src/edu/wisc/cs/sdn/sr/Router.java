@@ -420,23 +420,6 @@ public class Router
 
 					this.arpCache.waitForArp(etherPacket, this.interfaces.get(rtEntry.getInterface()), rtEntry.getGatewayAddress());
 					
-					
-					byte[] payloadBytes = new byte[8];
-
-					ByteBuffer bb = ByteBuffer.wrap(ipPacket.getPayload().serialize());
-
-					bb.get(payloadBytes, 0, 8);
-
-					IPv4 ipClone = (IPv4) ipPacket.clone();
-
-					Data data = new Data();
-					data.setData(payloadBytes);
-
-					ipClone.setPayload(data.deserialize(payloadBytes, 0, 8));
-					System.out.println("in route table, next hop not in cache");
-					
-					sendICMPMessage(inIface.getIpAddress(), ipPacket.getSourceAddress(), (byte) 1, (byte) 3, ipClone);
-					
 					return;
 
 				}

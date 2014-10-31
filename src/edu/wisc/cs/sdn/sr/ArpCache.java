@@ -155,6 +155,7 @@ public class ArpCache implements Runnable
 		if(request != null) {
 
 			for (Ethernet etherPacket : request.getWaitingPackets()) {
+				
 				etherPacket.setDestinationMACAddress(mac.toBytes());
 				etherPacket.setSourceMACAddress(request.getIface().getMacAddress().toBytes());
 
