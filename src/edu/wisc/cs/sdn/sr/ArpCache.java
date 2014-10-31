@@ -95,9 +95,6 @@ public class ArpCache implements Runnable
 		if (request.getSentCount() >= MAX_SEND_COUNT)
 		{
 
-
-			System.out.println("Host unreachable.");
-
 			// If the router does not receive a ARP reply (i.e. there is no host with that IP address),
 			// it should send to the original host an ICMP message informing the error.
 
@@ -236,8 +233,6 @@ public class ArpCache implements Runnable
 
 
 		// Send ARP request
-		System.out.println("Send ARP request");
-		System.out.println(etherPkt.toString());
 		this.router.sendPacket(etherPkt, request.getIface());
 	}
 
@@ -271,8 +266,6 @@ public class ArpCache implements Runnable
 		etherReply.setPayload(arpReply);
 
 		// Send ARP request
-		System.out.println("Send ARP reply");
-		System.out.println(arpReply.toString());
 		this.router.sendPacket(etherReply, iface);
 
 	}

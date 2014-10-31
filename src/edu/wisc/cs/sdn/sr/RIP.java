@@ -63,7 +63,6 @@ public class RIP implements Runnable
             rtEntry.setCost(0);
             
         }
-        //System.out.println("Route Table:\n"+this.router.getRouteTable());
 
 		this.tasksThread.start();
 
@@ -105,7 +104,6 @@ public class RIP implements Runnable
 			updateRouteTable(etherPacket, inIface);
 			
 		}
-		
 		
 		
 	}
@@ -161,14 +159,8 @@ public class RIP implements Runnable
 				long currentTime = System.currentTimeMillis();
 				
 				if (currentTime - rtEntry.getTimStamp()  > (TIMEOUT * 1000)) {
-					// The line below generates a ConcurrentModificationException
-					
-					//this.router.getRouteTable().removeEntry(rtEntry.getDestinationAddress(), rtEntry.getMaskAddress());
-					//System.out.println("Entry " + Util.intToDottedDecimal(rtEntry.getGatewayAddress()) + " timed out.");
 					
 					rtEntry.setCost(17); // Set to infinte.
-					
-					//iterator.remove();
 					
 					shouldSendAdvice = true;
 					
@@ -190,9 +182,6 @@ public class RIP implements Runnable
      * @param inIface the interface on which the packet was received
      */
 	public void updateRouteTable(Ethernet etherPacket, Iface inIface) {
-		
-		System.out.println("Updated route table.");
-		System.out.println(this.router.getRouteTable().toString());
 		
 		IPv4 ipPacket = (IPv4)etherPacket.getPayload();
 		UDP udpPacket = (UDP)ipPacket.getPayload();
@@ -233,7 +222,6 @@ public class RIP implements Runnable
 					
 				}
 								
-				
 			}
 		
 	}
@@ -302,7 +290,6 @@ public class RIP implements Runnable
 						}
 					}
 					
-					
 				}
 			}
 	
@@ -314,14 +301,9 @@ public class RIP implements Runnable
 			
 			this.router.sendPacket(etherPacket, iface);
 				
-				
 			} 
 		
 	}
-	
-	
-	
-	
 	
 	/**
      * Sends a RIP response to one specific host.
@@ -385,7 +367,6 @@ public class RIP implements Runnable
 		
 		this.router.handlePacket(etherPacket, inIface);
 		
-		
 	}
 	
 	
@@ -407,11 +388,7 @@ public class RIP implements Runnable
 			
 			ripEntry.setAddress(rtEntry.getDestinationAddress());
 			ripEntry.setSubnetMask(rtEntry.getMaskAddress());
-			
-			// Metric == cost
-			
-			ripEntry.setMetric(rtEntry.getCost());
-			
+			ripEntry.setMetric(rtEntry.getCost());	
 			ripEntry.setRouteTag(this.router.getTopo());
 			
 			// lookup the next hop address

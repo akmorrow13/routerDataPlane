@@ -223,20 +223,12 @@ public class Router
 
 		// Case 1: packet is of type ARP
 		if (etherPacket.getEtherType() == Ethernet.TYPE_ARP) {	
-
-			System.out.println("Received a ARP packet.");
-			
-			
-			System.out.println(etherPacket);
-			
 			
 			handleArpPacket(etherPacket, inIface);	
 
 			// Case 2: packet is of type IP 
 		} else if (etherPacket.getEtherType() == Ethernet.TYPE_IPv4) {
-
-			System.out.println("Received a IPv4 packet.");
-
+			
 			handleIpPacket(etherPacket, inIface);
 
 			return;
@@ -289,11 +281,8 @@ public class Router
 
 		case ARP.OP_REPLY:
 
-			System.out.println("Received a ARP reply.");
-
 			// Check if reply is for one of my interfaces
 			if (targetIp != inIface.getIpAddress()){ 
-				System.out.println("TargetIP is different! " + Util.intToDottedDecimal(targetIp));
 				break; 
 			}
 
@@ -344,7 +333,6 @@ public class Router
 		for(Iface ifaceRouter : interfaces.values()){
 
 			if (ifaceRouter.getIpAddress() == destinationIP || RIP.RIP_MULTICAST_IP == destinationIP){ // If the packer was sent to an router's interfaces.
-				System.out.println("Packet addressed to one of my interfaces.");
 				reRouteInterface(etherPacket, inIface);
 				sentToInterface = true;
 				return;
@@ -354,7 +342,6 @@ public class Router
 		// Case 2: destined to another IP.
 
 		if(!sentToInterface){
-			System.out.println("Packet addressed to other IP.");
 			reRouteNonInterface(etherPacket, inIface);
 			return;
 		}
@@ -444,8 +431,6 @@ public class Router
 			}
 
 		} else {
-			
-			System.out.println("There is no way to reach host.");
 
 			byte[] payloadBytes = new byte[8];
 
@@ -472,8 +457,6 @@ public class Router
 		etherPacket.setSourceMACAddress(ifaceOut.getMacAddress().toBytes());
 
 		sendPacket(etherPacket, ifaceOut);
-
-		System.out.println("Packet sent to a new IP.");
 	}
 
 	/**
@@ -535,7 +518,7 @@ public class Router
 
 			// If it is UDP and port 520, repass the request to RIP.
 			if(udpPacket.getDestinationPort() == 520) {
-				System.out.println("Received a 520 UDP");
+				
 				rip.handlePacket(etherPacket, inIface);
 			} else {
 
@@ -555,8 +538,6 @@ public class Router
 			}
 
 		} else if (ipPacket.getProtocol() == IPv4.PROTOCOL_TCP) {
-
-			System.out.println("Received a TCP.");
 
 			byte[] payloadBytes = new byte[8];
 
@@ -636,8 +617,6 @@ public class Router
 		RouteTableEntry rtEntry = this.routeTable.findBestEntry(destIp); // Get the route entry for this IP.
 
 		if(rtEntry == null) {
-
-			System.out.println("No route to " + Util.intToDottedDecimal(destIp));
 			return;
 
 		}
@@ -751,7 +730,6 @@ public class Router
 		}
 
 		// Send ICMP request
-		System.out.println("Sending ICMP message");
 
 		this.sendPacket(etherPacket, iface);
 
