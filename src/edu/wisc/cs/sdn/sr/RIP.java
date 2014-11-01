@@ -69,6 +69,9 @@ public class RIP implements Runnable
 
 		// Send RIP request in broadcast.
 		sendRIPMessageMulticast(RIPv2.COMMAND_REQUEST);
+		
+		// That is important, because in the beginning all the other routers can know the routes that belong to the new router.
+		// Without this part, the other routers need to wait 10 seconds to receive the first update.
 		sendRIPMessageMulticast(RIPv2.COMMAND_RESPONSE);
 		
 	}
@@ -136,7 +139,8 @@ public class RIP implements Runnable
 	
 	
 	/**
-     * Checks if any entry in the route table timed out and remove it.
+     * Checks if any entry in the route table timed out. If yes, the router should set the cost related to that entry
+     * to infinite (i.e 17).
      */
 	private void checkForTimeout() {
 		
@@ -145,12 +149,14 @@ public class RIP implements Runnable
 		//System.out.println("Checking for timeout.");
 		
 		Iterator<RouteTableEntry> iterator = this.router.getRouteTable().getEntries().iterator();
+		
 		RouteTableEntry rtEntry = null;
 		
 		while (iterator.hasNext()) {
 			
-			// if an entry is a direct neighbor, do nothing
 			rtEntry = iterator.next();
+			
+			// If an entry is a direct neighbor, do nothing.
 			
 			if (rtEntry.getCost() < 1) {
 				
@@ -160,15 +166,9 @@ public class RIP implements Runnable
 				
 				long currentTime = System.currentTimeMillis();
 				
-				if (currentTime - rtEntry.getTimStamp()  > (TIMEOUT * 1000)) {
-					// The line below generates a ConcurrentModificationException
+				if (currentTime - rtEntry.getTimStamp()  > (TIMEOUT * 1000)) { // Checks if this entry timed out.
 					
-					//this.router.getRouteTable().removeEntry(rtEntry.getDestinationAddress(), rtEntry.getMaskAddress());
-					//System.out.println("Entry " + Util.intToDottedDecimal(rtEntry.getGatewayAddress()) + " timed out.");
-					
-					rtEntry.setCost(17); // Set to infinte.
-					
-					//iterator.remove();
+					rtEntry.setCost(17); // Set the cost to infinite.
 					
 					shouldSendAdvice = true;
 					
@@ -176,7 +176,7 @@ public class RIP implements Runnable
 			}
 		}
 		
-		// If some host timed out, the router should advice the others about that.
+		// If any host timed out, the router should advice the others about that.
 		
 		if(shouldSendAdvice) {
 			sendRIPMessageMulticast(RIPv2.COMMAND_RESPONSE);
@@ -191,14 +191,14 @@ public class RIP implements Runnable
      */
 	public void updateRouteTable(Ethernet etherPacket, Iface inIface) {
 		
-		System.out.println("Updated route table.");
+		System.out.println("Updated route table after receiving a RIP response.");
 		System.out.println(this.router.getRouteTable().toString());
 		
 		IPv4 ipPacket = (IPv4)etherPacket.getPayload();
 		UDP udpPacket = (UDP)ipPacket.getPayload();
 		RIPv2 ripPacket = (RIPv2)udpPacket.getPayload();
 		
-		for (RIPv2Entry ripEntry : ripPacket.getEntries()) {
+		for (RIPv2Entry ripEntry : ripPacket.getEntries()) { // Iterate over all entries in the RIP packet.
 					
 				RouteTableEntry rtEntry = this.router.getRouteTable().findEntry(ripEntry.getAddress(), ripEntry.getSubnetMask());
 				RouteTableEntry newRtEntry = null;
@@ -209,18 +209,20 @@ public class RIP implements Runnable
 				newRtEntry.setCost(ripEntry.getMetric() + 1);
 				newRtEntry.setTimeStamp(System.currentTimeMillis());
 				
-				if(newRtEntry.getCost() >= INFINITE_COST) { // Infinite
-					// Drop this packet.
+				if(newRtEntry.getCost() >= INFINITE_COST) { // If the entry cost is infinite, skip this entry.
+			
 					return;
 				}
 				
-				if (rtEntry == null) {
+				if (rtEntry == null) { // If this entry is not in the route table, simply add it.
 					
 					this.router.getRouteTable().addEntry(newRtEntry);
 					
 				} else {
 					
-					if (rtEntry.getCost() >= (ripEntry.getMetric() + 1)) {
+					// If the entry exists in the route table, but now it has a lower cost than the old entry, replace the old with the new.
+					
+					if (rtEntry.getCost() >= (ripEntry.getMetric() + 1)) { 
 						
 						this.router.getRouteTable().removeEntry(rtEntry.getDestinationAddress(), rtEntry.getMaskAddress());
 						this.router.getRouteTable().addEntry(newRtEntry);
@@ -247,6 +249,8 @@ public class RIP implements Runnable
 		
 		RIPv2 ripPacket = null;
 		
+		// Checks the RIP packet type.
+		
 		if(ripType == RIPv2.COMMAND_REQUEST) {
 			ripPacket = makeRipPacket(RIPv2.COMMAND_REQUEST);
 			
@@ -257,6 +261,8 @@ public class RIP implements Runnable
 			return;
 		}
 	
+		
+		// Create the structure of the packets.
 		
 		UDP udpPacket = new UDP();
 		IPv4 ipPacket = new IPv4();;
@@ -280,7 +286,7 @@ public class RIP implements Runnable
 		etherPacket.setEtherType(Ethernet.TYPE_IPv4);
 		etherPacket.setPayload(ipPacket);
 		
-		// The split horizon is implemented below, but I couldn't test it yet.
+		// The split horizon is implemented below, but it was not possible to test it.
 		
 		RIPv2 ripPacketCopy = (RIPv2) ripPacket.clone();
 		
@@ -290,13 +296,14 @@ public class RIP implements Runnable
 			
 			for(RouteTableEntry rtEntry : this.router.getRouteTable().getEntries()) {
 				
-				if(rtEntry.getInterface().equals(iface.getName()) && rtEntry.getGatewayAddress() != 0) { // Non local entry found.
+				if(rtEntry.getInterface().equals(iface.getName()) && rtEntry.getGatewayAddress() != 0) { // Non local entry found in the route table.
 					
 					for(RIPv2Entry ripEntry : ripPacket.getEntries()) {
+						
 						if(ripEntry.getNextHopAddress() == rtEntry.getGatewayAddress()) {
 							
-							// Remove from my RIP packet that the destination can reach a network using me, 
-							// because, actually, I learned this route from it.
+							// Remove from my RIP packet this entry, because I learned that I can reach the final destination using
+							// from this gateway.
 							
 							ripPacket.getEntries().remove(ripEntry); 
 						}
@@ -369,12 +376,14 @@ public class RIP implements Runnable
 		
 		etherPacket.setPayload(ipPacket);
 		
-		// Split to horizon
- 
+		// Split to horizon to the unicast.
 		
 		for(RIPv2Entry ripEntry : ripPacket.getEntries()){
 			
 			if(ripEntry.getNextHopAddress() == ipPacket.getDestinationAddress()) {
+				
+				// If this route was learned from this gateway,
+				// remove this entry.
 				
 				ripPacket.getEntries().remove(ripEntry);
 				
@@ -382,8 +391,9 @@ public class RIP implements Runnable
 			
 		}
 		
+		//this.router.handlePacket(etherPacket, inIface);
 		
-		this.router.handlePacket(etherPacket, inIface);
+		this.router.sendPacket(etherPacket, inIface);
 		
 		
 	}
@@ -414,7 +424,8 @@ public class RIP implements Runnable
 			
 			ripEntry.setRouteTag(this.router.getTopo());
 			
-			// lookup the next hop address
+			// Lookup the next hop address
+			
 			Iface nextIface = this.router.getInterface(rtEntry.getInterface());
 			ripEntry.setNextHopAddress(nextIface.getIpAddress());
 			
